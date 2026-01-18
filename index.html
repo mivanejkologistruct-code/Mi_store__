@@ -1,0 +1,295 @@
+<!doctype html>
+<html lang="uk">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>MI_STORE — чоловіча білизна</title>
+  <link rel="stylesheet" href="css/style.css" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+</head>
+<body id="top">
+
+<!-- HEADER -->
+<header class="header">
+  <div class="container row">
+    <a class="brand" id="brandClick" href="index.html">
+      <div class="logo"><img src="images/logo.png" alt="MI_STORE"><small>MI_STORE</small></div>
+      <div class="tag">чоловіча білизна</div>
+    </a>
+    <nav class="nav">
+      <a href="#homeCatalog" class="active">Каталог</a>
+      <a href="#about">Про нас</a>
+    </nav>
+    <div class="header-actions">
+      <a class="btn btn-ghost header-contact" href="#instaIntro">Instagram</a>
+      <a class="cart-link" href="checkout.html" aria-label="Кошик">🛒</a>
+    </div>
+  </div>
+</header>
+
+<main>
+  <!-- ЧОЛОВІЧИЙ MUST HAVE -->
+  <section class="container card musthave reveal" id="mustHave">
+    <div class="musthave-copy">
+      <div class="section-header">
+        <h2 class="section-title">Чоловічий MUST HAVE</h2>
+        <span class="price-tag">Без доплат • 5 або 4 шт у комплекті</span>
+      </div>
+      <p class="section-description" data-mh-desc>5 шт MUST HAVE з Airflow, Classic або Midnight — три фактури, які тримають форму та не перегрівають.</p>
+      <ul class="musthave-list" data-mh-list>
+        <li>5 шт у комплекті — економія на кожній парі</li>
+        <li>Airflow — перфорація та охолодження</li>
+        <li>Midnight — преміум мікрофібра з темним поясом</li>
+      </ul>
+      <div class="musthave-bottom">
+        <div>
+          <span class="muted">До завершення акції</span>
+          <strong id="timer" data-hours="18">—:—:—</strong>
+        </div>
+        <a href="#homeCatalog" class="btn btn-primary">Обрати комплект</a>
+      </div>
+    </div>
+    <div class="musthave-media">
+      <div class="musthave-slider" data-musthave-slider tabindex="0">
+        <button class="slider-nav prev" type="button" data-prev aria-label="Попереднє фото">‹</button>
+        <img src="images/promo-musthave 1.jpg" alt="MUST HAVE профіль" loading="lazy">
+        <button class="slider-nav next" type="button" data-next aria-label="Наступне фото">›</button>
+        <div class="slider-dots" aria-hidden="true"></div>
+        <div class="slider-progress" aria-hidden="true"><span data-mh-progress></span></div>
+      </div>
+      <div class="musthave-note" data-mh-note>5 шт = 990 грн · швидка відправка Новою поштою</div>
+    </div>
+  </section>
+
+  <!-- REVIEWS -->
+  <section id="reviews" class="container card reveal">
+    <div class="section-header">
+      <h2 class="section-title">Відгуки з фото</h2>
+      <a class="btn btn-ghost" href="https://www.instagram.com/mi__store___/" target="_blank">Instagram</a>
+    </div>
+    <div class="review-grid"></div>
+  </section>
+
+  <!-- CATALOG -->
+  <section class="container card reveal" id="homeCatalog">
+    <div class="section-header">
+      <h2 class="section-title">Каталог на головній</h2>
+      <span class="price-tag">S-4XL</span>
+    </div>
+    <p class="section-description">Весь товар на одній сторінці. Обирай модель, одразу дивись галерею та запускай оформлення з правого боку екрана.</p>
+    <div class="size-note">Усі комплекти маломірні. Якщо вагаєшся — бери більший розмір.</div>
+    <div class="home-layout">
+      <aside class="home-filter" id="homeFilter">
+        <h3>Фільтр</h3>
+        <div class="filter-group">
+          <p>Розмір</p>
+          <div class="filter-chips">
+            <button type="button" data-size="S">S</button>
+            <button type="button" data-size="M">M</button>
+            <button type="button" data-size="L">L</button>
+            <button type="button" data-size="XL">XL</button>
+            <button type="button" data-size="2XL">2XL</button>
+            <button type="button" data-size="3XL">3XL</button>
+            <button type="button" data-size="4XL">4XL</button>
+          </div>
+        </div>
+        <div class="filter-group">
+          <p>Комплект</p>
+          <label><input type="radio" name="homePack" value="" checked>Усі</label>
+          <label><input type="radio" name="homePack" value="2">2 шт</label>
+          <label><input type="radio" name="homePack" value="4">4 шт</label>
+          <label><input type="radio" name="homePack" value="5">5 шт</label>
+        </div>
+        <div class="filter-group">
+          <p>Тип</p>
+          <label><input type="radio" name="homeType" value="" checked>Усі</label>
+          <label><input type="radio" name="homeType" value="underwear">Труси</label>
+          <label><input type="radio" name="homeType" value="thermal">Термобілизна</label>
+        </div>
+        <div class="filter-group price-block">
+          <p>Ціна</p>
+          <div class="price-range-row">
+            <input type="range" id="home-price-min" min="600" max="1400" step="10" value="600">
+            <input type="range" id="home-price-max" min="600" max="1400" step="10" value="1400">
+          </div>
+          <div class="price-range-labels">
+            <span id="home-price-min-val">— грн</span>
+            <span id="home-price-max-val">— грн</span>
+          </div>
+        </div>
+        <button class="btn btn-ghost filter-reset" type="button" id="homeFilterReset">Скинути фільтр</button>
+      </aside>
+      <div class="home-products">
+        <div class="prod-grid" id="homeCatalogGrid"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- FEATURES -->
+  <section class="container card reveal features-bento">
+    <h2 class="section-title">Чому MI_STORE</h2>
+    <div class="features-grid">
+      <div class="feature"><div class="icon">🪡</div><div>Безшовний крій та гладкі пояси — комфорт у русі.</div></div>
+      <div class="feature"><div class="icon">🩳</div><div>Анатомічна посадка з бамбуком і бавовною.</div></div>
+      <div class="feature"><div class="icon">🌬️</div><div>Дихаюча тканина, що виводить вологу.</div></div>
+      <div class="feature"><div class="icon">🚚</div><div>Нова пошта по Україні, післяплата чи повна оплата.</div></div>
+    </div>
+  </section>
+
+  <!-- ABOUT -->
+  <section class="container card about-section reveal" id="about">
+    <div class="about-main">
+      <h2 class="section-title">Про нас</h2>
+      <p>MI_STORE — невелика команда, що напряму возить Vericoh і Uomo без посередників. Тестуємо посадку самі, знімаємо контент у своїй студії та відповідаємо у месенджерах так, ніби ти поруч у шоурумі.</p>
+      <ul class="about-list">
+        <li>Кожна партія проходить ручний контроль: пояс, шви, посадка.</li>
+        <li>Підбираємо комплект під твою вагу/зріст, даємо чесні рекомендації.</li>
+        <li>Instagram з реальними фото клієнтів і прямими відгуками.</li>
+        <li>Нова пошта по Україні, післяплата або повна оплата — як зручно.</li>
+      </ul>
+    </div>
+    <div class="about-stats">
+      <article>
+        <strong>5 років</strong>
+        <span>відправляємо щодня</span>
+      </article>
+      <article>
+        <strong>775</strong>
+        <span>постів в Instagram</span>
+      </article>
+      <article>
+        <strong>16K+</strong>
+        <span>клієнтів довіряють</span>
+      </article>
+    </div>
+  </section>
+
+  <!-- SIZE GUIDE -->
+  <section class="container card reveal size-guide-section">
+    <div class="section-header">
+      <h2 class="section-title">Розмірна сітка</h2>
+      <button class="btn btn-ghost" data-size-modal>Відкрити у повному розмірі</button>
+    </div>
+    <p class="size-lead">Підібрати свій розмір просто: звірся з таблицею нижче або натисни кнопку, щоб переглянути сітку у повному розмірі.</p>
+    <div class="size-guide-frame">
+      <img src="images/size-guide.jpg" alt="Розмірна сітка MI_STORE" loading="lazy">
+    </div>
+  </section>
+
+  <!-- INSTAGRAM NEAR FOOTER -->
+  <section class="container card insta-intro reveal" id="instaIntro">
+    <div class="insta-content">
+      <div class="section-header">
+        <h2 class="section-title">Instagram <span class="insta-handle" data-insta-handle>@mi__store___</span></h2>
+        <a class="btn btn-ghost" data-insta-link target="_blank" rel="noopener">Перейти в Instagram</a>
+      </div>
+      <p class="section-description" data-insta-bio>Чоловічі труси, білизна й боксери у щоденній стрічці MI_STORE.</p>
+      <div class="insta-stats" data-insta-stats></div>
+      <div class="insta-actions">
+        <button class="btn btn-primary" onclick="document.getElementById('homeCatalog').scrollIntoView({behavior:'smooth'});">Одразу до каталогу</button>
+        <span class="insta-note" data-insta-note>Instagram — майже внизу, як ти просив.</span>
+      </div>
+    </div>
+    <div class="insta-aside">
+      <div class="insta-avatar">
+        <img src="images/logo.png" alt="@mi__store___" loading="lazy" data-insta-avatar>
+      </div>
+      <div class="insta-pill" data-insta-posts>Пости з живими відгуками</div>
+      <p class="insta-mini" data-insta-tagline>Чоловіча білизна, яка сидить ідеально.</p>
+    </div>
+  </section>
+
+</main>
+
+<!-- FOOTER -->
+<footer class="container footer">
+  <div>
+    <div class="logo"><img src="images/logo.png" alt="logo"><small>MI_STORE</small></div>
+    <p>Відправляємо Новою поштою по всій Україні.</p>
+  </div>
+  <div class="footer-links">
+    <a href="#mustHave">Чоловічий MUST HAVE</a>
+    <a href="#about">Про нас</a>
+    <a href="https://www.instagram.com/mi__store___/" target="_blank">Instagram</a>
+  </div>
+</footer>
+
+<!-- ORDER DRAWER -->
+<div class="order-overlay" id="orderOverlay"></div>
+<aside class="order-drawer" id="orderDrawer" aria-hidden="true">
+  <button class="drawer-close" type="button" data-cart-close>&times;</button>
+  <p class="drawer-label">Швидке замовлення</p>
+  <div class="drawer-product">
+    <img src="" alt="" id="drawerProductImage" loading="lazy">
+    <div>
+      <h3 id="drawerProductName"></h3>
+      <p id="drawerProductMeta"></p>
+    </div>
+  </div>
+  <div class="drawer-pack">
+    <label>Розмір
+      <select id="drawerSize"></select>
+    </label>
+    <label>Комплект
+      <select id="drawerPackSize"></select>
+    </label>
+    <div class="qty-control">
+      <button type="button" data-qty="minus">−</button>
+      <div class="qty-readout">
+        <strong id="drawerPackCount">1 комплект</strong>
+        <small id="drawerPiecesCount">4 штуки</small>
+      </div>
+      <button type="button" data-qty="plus">+</button>
+    </div>
+  </div>
+  <div class="drawer-total">
+    <div>
+      <span class="muted">Ціна комплекту</span>
+      <strong id="drawerPricePerPack">— грн</strong>
+    </div>
+    <div>
+      <span class="muted">До оплати (без доставки)</span>
+      <strong id="drawerTotal">— грн</strong>
+    </div>
+  </div>
+  <div class="drawer-actions">
+    <button class="btn btn-primary" type="button" id="drawerCheckout">Оформити замовлення</button>
+  </div>
+</aside>
+
+<dialog id="drawerCheckoutModal" class="modal">
+  <form method="dialog" class="modal-card drawer-checkout-card" id="drawerCheckoutForm">
+    <div class="drawer-checkout-head">
+      <h3>Оформлення замовлення</h3>
+      <p class="drawer-checkout-summary" id="drawerCheckoutSummary">—</p>
+    </div>
+    <div class="form-grid order-form-grid">
+      <label>Ім’я<input required name="firstName" placeholder="Ім’я"></label>
+      <label>Прізвище<input required name="lastName" placeholder="Прізвище"></label>
+      <label>Телефон<input required name="phone" placeholder="+380"></label>
+      <label>Місто НП
+        <select required id="npCity" name="npCity"></select>
+        <div class="branch-search"><input type="search" id="npCitySearch" placeholder="Пошук міста"></div>
+      </label>
+      <label>Відділення / поштомат НП
+        <select required id="npBranch" name="npBranch"></select>
+        <div class="branch-search"><input type="search" id="npBranchSearch" placeholder="Пошук відділення або поштомату"></div>
+      </label>
+      <label>Спосіб оплати
+        <select name="payment" required>
+          <option value="cod">Післяплата</option>
+          <option value="full">Повна оплата</option>
+        </select>
+      </label>
+      <label>Коментар<textarea name="comment" rows="2" placeholder="Розмір, бажаний колір..."></textarea></label>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-primary" type="submit">Оформити замовлення</button>
+      <button class="btn" type="button" data-dialog-close="cancel">Закрити</button>
+    </div>
+  </form>
+</dialog>
+
+<script src="js/main.js"></script>
+</body>
+</html>

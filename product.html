@@ -1,0 +1,105 @@
+﻿<!doctype html>
+<html lang="uk">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Товар — MI_STORE</title>
+  <link rel="stylesheet" href="css/style.css" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+<header class="header">
+  <div class="container row">
+    <a class="brand" id="brandClick" href="index.html">
+      <div class="logo"><img src="images/logo.png" alt="MI_STORE"><small>MI_STORE</small></div>
+      <div class="tag">чоловіча білизна</div>
+    </a>
+    <nav class="nav">
+      <a href="index.html#homeCatalog" class="active">Каталог</a>
+      <a href="index.html#mustHave">Чоловічий MUST HAVE</a>
+      <a href="index.html#about">Про нас</a>
+    </nav>
+    <a class="cart-link" href="checkout.html" aria-label="Кошик">🛒</a>
+  </div>
+</header>
+
+<section class="container card reveal" id="productHolder"></section>
+
+<div class="order-overlay" id="orderOverlay"></div>
+<aside class="order-drawer" id="orderDrawer" aria-hidden="true">
+  <button class="drawer-close" type="button" data-cart-close>&times;</button>
+  <p class="drawer-label">Швидке замовлення</p>
+  <div class="drawer-product">
+    <img src="" alt="" id="drawerProductImage" loading="lazy">
+    <div>
+      <h3 id="drawerProductName"></h3>
+      <p id="drawerProductMeta"></p>
+    </div>
+  </div>
+  <div class="drawer-pack">
+    <label>Розмір
+      <select id="drawerSize"></select>
+    </label>
+    <label>Комплект
+      <select id="drawerPackSize"></select>
+    </label>
+    <div class="qty-control">
+      <button type="button" data-qty="minus">−</button>
+      <div class="qty-readout">
+        <strong id="drawerPackCount">1 комплект</strong>
+        <small id="drawerPiecesCount">4 штуки</small>
+      </div>
+      <button type="button" data-qty="plus">+</button>
+    </div>
+  </div>
+  <div class="drawer-total">
+    <div>
+      <span class="muted">Ціна комплекту</span>
+      <strong id="drawerPricePerPack">— грн</strong>
+    </div>
+    <div>
+      <span class="muted">До оплати (без доставки)</span>
+      <strong id="drawerTotal">— грн</strong>
+    </div>
+  </div>
+  <div class="drawer-actions">
+    <button class="btn btn-primary" type="button" id="drawerCheckout">Оформити замовлення</button>
+  </div>
+</aside>
+
+<dialog id="drawerCheckoutModal" class="modal">
+  <form method="dialog" class="modal-card drawer-checkout-card" id="drawerCheckoutForm">
+    <div class="drawer-checkout-head">
+      <h3>Оформлення замовлення</h3>
+      <p class="drawer-checkout-summary" id="drawerCheckoutSummary">—</p>
+    </div>
+    <div class="form-grid order-form-grid">
+      <label>Ім’я<input required name="firstName" placeholder="Ім’я"></label>
+      <label>Прізвище<input required name="lastName" placeholder="Прізвище"></label>
+      <label>Телефон<input required name="phone" placeholder="+380"></label>
+      <label>Місто НП
+        <select required id="npCity" name="npCity"></select>
+        <div class="branch-search"><input type="search" id="npCitySearch" placeholder="Пошук міста"></div>
+      </label>
+      <label>Відділення / поштомат НП
+        <select required id="npBranch" name="npBranch"></select>
+        <div class="branch-search"><input type="search" id="npBranchSearch" placeholder="Пошук відділення або поштомату"></div>
+      </label>
+      <label>Спосіб оплати
+        <select name="payment" required>
+          <option value="cod">Післяплата</option>
+          <option value="full">Повна оплата</option>
+        </select>
+      </label>
+      <label>Коментар<textarea name="comment" rows="2" placeholder="Побажання до замовлення"></textarea></label>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-primary" type="submit">Оформити замовлення</button>
+      <button class="btn" type="button" data-dialog-close="cancel">Закрити</button>
+    </div>
+  </form>
+</dialog>
+
+<script src="js/main.js"></script>
+</body>
+</html>

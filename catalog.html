@@ -1,0 +1,283 @@
+﻿<!doctype html>
+<html lang="uk">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Каталог — MI_STORE</title>
+  <link rel="stylesheet" href="css/style.css" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+
+<!-- HEADER -->
+<header class="header">
+  <div class="container row">
+    <a class="brand" id="brandClick" href="index.html">
+      <div class="logo"><img src="images/logo.png" alt="MI_STORE"><small>MI_STORE</small></div>
+      <div class="tag">чоловіча білизна</div>
+    </a>
+    <nav class="nav">
+      <a href="index.html">Головна</a>
+      <a href="#kit">Акція</a>
+      <a href="contacts.html">Контакти</a>
+    </nav>
+    <a class="cart-link" href="checkout.html" aria-label="Кошик">🛒</a>
+  </div>
+</header>
+
+<!-- PROMO (каталог) -->
+<section class="container card promo reveal" id="kit">
+  <div>
+    <div class="promo-chip">обмежений дроп</div>
+    <h2 class="section-title">Комплект MUST-HAVE</h2>
+    <p>4 шт = <span class="old-price">890 грн</span> <b class="price-new">850 грн</b> / шт + 2 пари шкарпеток у подарунок</p>
+    <p>До завершення акції: <b id="timer" data-hours="12">—:—:—</b></p>
+    <div class="promo-pills" data-promo-pills>
+      <span>4 шт у комплекті</span>
+      <span>Подарунок: 2 пари шкарпеток</span>
+      <span>Відправка НП по Україні</span>
+    </div>
+    <button class="btn btn-primary" id="openKitBuilder">Оформити комплект</button>
+  </div>
+  <div class="promo-right"><img src="images/promo-musthave.jpg" alt="Комплект чоловічий MUST-HAVE"></div>
+</section>
+
+<!-- DEALS -->
+<section class="container card deals reveal">
+  <div class="section-header">
+    <h2 class="section-title">Акції та бонуси</h2>
+    <a class="btn btn-ghost" href="#kit">До комплекту</a>
+  </div>
+  <p class="section-description">Увесь каталог зараз коштує 850 грн за одиницю зі старим прайсом 890 грн. Обери, як саме скористатися пропозицією.</p>
+  <div class="deal-grid">
+    <article class="deal-card">
+      <span class="deal-label">Mix &amp; match</span>
+      <h3>Комбінуй розміри</h3>
+      <p>4 шт будь-яких моделей: добирай розміри по кожному рядку в заявці.</p>
+      <div class="deal-price">
+        <span class="price-new">850 грн</span>
+        <span class="price-old">890 грн</span>
+      </div>
+      <span class="deal-chip">за пару</span>
+    </article>
+    <article class="deal-card">
+      <span class="deal-label">On demand</span>
+      <h3>Персональний підбір</h3>
+      <p>Менеджер підбере текстуру та пояс під твій стиль і все одно зафіксує 850 грн.</p>
+      <div class="deal-price">
+        <span class="price-new">850 грн</span>
+        <span class="price-old">890 грн</span>
+      </div>
+      <span class="deal-chip">ціна єдина</span>
+    </article>
+  </div>
+</section>
+
+<!-- INSTAGRAM BLOCK -->
+<section class="container card insta-intro insta-compact reveal">
+  <div class="insta-content">
+    <div class="section-header">
+      <h2 class="section-title">Instagram <span class="insta-handle" data-insta-handle>@mi__store___</span></h2>
+      <a class="btn btn-ghost" data-insta-link target="_blank" rel="noopener">Профіль</a>
+    </div>
+    <p class="section-description" data-insta-bio>Чоловіча білизна й реальні тести тканин у стрічці MI_STORE.</p>
+    <div class="insta-stats" data-insta-stats></div>
+  </div>
+</section>
+
+<!-- КАТАЛОГ -->
+<section class="container catalog-wrap">
+  <!-- Фільтри -->
+  <aside class="filter-card reveal">
+    <h3>Пошук</h3>
+    <input id="f-search" class="search-input" placeholder="Назва / модель" />
+
+    <div class="filter-block">
+      <h3>Розмір</h3>
+      <span class="filter-chip" data-size="S">S</span>
+      <span class="filter-chip" data-size="M">M</span>
+      <span class="filter-chip" data-size="L">L</span>
+      <span class="filter-chip" data-size="XL">XL</span>
+      <span class="filter-chip" data-size="2XL">2XL</span>
+      <span class="filter-chip" data-size="3XL">3XL</span>
+      <span class="filter-chip" data-size="4XL">4XL</span>
+      <label class="only-avail"><input id="f-avail" type="checkbox"> тільки в наявності</label>
+    </div>
+
+    <div class="filter-block">
+      <h3>Тип</h3>
+      <span class="filter-chip active" data-cat="">Усі</span>
+      <span class="filter-chip" data-cat="underwear">Труси</span>
+      <span class="filter-chip" data-cat="thermal">Термобілизна</span>
+    </div>
+
+    <div class="filter-block price-block">
+      <h3>Ціна</h3>
+      <div class="price-range-row">
+        <input type="range" id="f-price-min" min="600" max="1400" step="10" value="600">
+        <input type="range" id="f-price-max" min="600" max="1400" step="10" value="1400">
+      </div>
+      <div class="price-range-labels">
+        <span id="f-price-min-val">600 грн</span>
+        <span id="f-price-max-val">1400 грн</span>
+      </div>
+    </div>
+
+    <div class="filter-actions">
+      <button class="btn" id="f-reset">Скинути фільтри</button>
+    </div>
+  </aside>
+
+  <!-- Список товарів -->
+  <div class="catalog-main">
+    <div class="toolbar">
+      <div class="count">0 товар(и)</div>
+      <div class="sort-select">
+        <label style="color:var(--muted);margin-right:8px">Сортувати:</label>
+        <select id="f-sort">
+          <option value="popular">популярні</option>
+          <option value="priceAsc">дешевші</option>
+          <option value="priceDesc">дорожчі</option>
+          <option value="newest">нові</option>
+        </select>
+      </div>
+    </div>
+    <div class="prod-grid"></div>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer class="container footer">
+  <div>
+    <div class="logo"><img src="images/logo.png" alt="logo"><small>MI_STORE</small></div>
+    <p>Доставка по Україні.</p>
+  </div>
+  <div class="footer-links">
+    <a href="https://www.instagram.com/mi__store___/" target="_blank">Instagram</a>
+    <a href="https://t.me/" target="_blank">Telegram</a>
+    <a href="policies.html">Політики</a>
+  </div>
+</footer>
+
+<!-- ORDER DRAWER -->
+<div class="order-overlay" id="orderOverlay"></div>
+<aside class="order-drawer" id="orderDrawer" aria-hidden="true">
+  <button class="drawer-close" type="button" data-cart-close>&times;</button>
+  <p class="drawer-label">Швидке замовлення</p>
+  <div class="drawer-product">
+    <img src="" alt="" id="drawerProductImage" loading="lazy">
+    <div>
+      <h3 id="drawerProductName"></h3>
+      <p id="drawerProductMeta"></p>
+    </div>
+  </div>
+  <div class="drawer-pack">
+    <label>Розмір
+      <select id="drawerSize"></select>
+    </label>
+    <label>Комплект
+      <select id="drawerPackSize"></select>
+    </label>
+    <div class="qty-control">
+      <button type="button" data-qty="minus">−</button>
+      <div class="qty-readout">
+        <strong id="drawerPackCount">1 комплект</strong>
+        <small id="drawerPiecesCount">4 штуки</small>
+      </div>
+      <button type="button" data-qty="plus">+</button>
+    </div>
+  </div>
+  <div class="drawer-total">
+    <div>
+      <span class="muted">Ціна комплекту</span>
+      <strong id="drawerPricePerPack">— грн</strong>
+    </div>
+    <div>
+      <span class="muted">До оплати (без доставки)</span>
+      <strong id="drawerTotal">— грн</strong>
+    </div>
+  </div>
+  <div class="drawer-actions">
+    <button class="btn btn-primary" type="button" id="drawerCheckout">Оформити замовлення</button>
+  </div>
+</aside>
+
+<dialog id="drawerCheckoutModal" class="modal">
+  <form method="dialog" class="modal-card drawer-checkout-card" id="drawerCheckoutForm">
+    <div class="drawer-checkout-head">
+      <h3>Оформлення замовлення</h3>
+      <p class="drawer-checkout-summary" id="drawerCheckoutSummary">—</p>
+    </div>
+    <div class="form-grid order-form-grid">
+      <label>Ім’я<input required name="firstName" placeholder="Ім’я"></label>
+      <label>Прізвище<input required name="lastName" placeholder="Прізвище"></label>
+      <label>Телефон<input required name="phone" placeholder="+380"></label>
+      <label>Місто НП
+        <select required id="npCity" name="npCity"></select>
+        <div class="branch-search"><input type="search" id="npCitySearch" placeholder="Пошук міста"></div>
+      </label>
+      <label>Відділення / поштомат НП
+        <select required id="npBranch" name="npBranch"></select>
+        <div class="branch-search"><input type="search" id="npBranchSearch" placeholder="Пошук відділення або поштомату"></div>
+      </label>
+      <label>Спосіб оплати
+        <select name="payment" required>
+          <option value="cod">Післяплата</option>
+          <option value="full">Повна оплата</option>
+        </select>
+      </label>
+      <label>Коментар<textarea name="comment" rows="2" placeholder="Побажання до замовлення"></textarea></label>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-primary" type="submit">Оформити замовлення</button>
+      <button class="btn" type="button" data-dialog-close="cancel">Закрити</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- MODALS -->
+<dialog id="orderModal" class="modal">
+  <form method="dialog" class="modal-card" id="orderForm">
+    <h3 id="orderTitle">Замовлення</h3>
+    <p id="orderProductMeta"></p>
+    <div class="form-grid">
+      <label>Ваше ім’я<input required name="name"></label>
+      <label>Телефон<input required name="phone"></label>
+      <label>Місто/Відділення НП<input required name="np"></label>
+      <label>Спосіб зв’язку
+        <select name="channel">
+          <option value="phone">Телефон</option>
+          <option value="instagram">Instagram</option>
+          <option value="telegram">Telegram</option>
+        </select>
+      </label>
+      <label>Коментар<textarea name="comment" rows="2"></textarea></label>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-primary" value="submit">Відправити заявку</button>
+      <button class="btn" value="cancel" data-dialog-close="cancel">Закрити</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="kitModal" class="modal">
+  <form method="dialog" class="modal-card" id="kitForm">
+    <h3>Оформлення комплекту (4 шт = <span class="price-old">890 грн</span> <span class="price-new">850 грн</span> / шт)</h3>
+    <div id="kitBuilder" class="kit-grid"></div>
+    <div class="form-grid">
+      <label>Ваше ім’я<input required name="name"></label>
+      <label>Телефон<input required name="phone"></label>
+      <label>Місто/Відділення НП<input required name="np"></label>
+      <label>Коментар<textarea name="comment" rows="2"></textarea></label>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-primary" value="submit">Замовити комплект</button>
+      <button class="btn" value="cancel" data-dialog-close="cancel">Закрити</button>
+    </div>
+  </form>
+</dialog>
+
+<script src="js/main.js"></script>
+</body>
+</html>
+
