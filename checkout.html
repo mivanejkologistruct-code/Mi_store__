@@ -70,24 +70,24 @@
       <h3>Дані для доставки</h3>
       <form id="checkoutForm" class="checkout-form">
         <div class="form-grid">
-          <label>Ім’я<input required name="firstName" placeholder="Ім’я"></label>
-          <label>Прізвище<input required name="lastName" placeholder="Прізвище"></label>
-          <label>Телефон<input required name="phone" placeholder="+380"></label>
+          <label>Ім’я<input required id="firstName" name="firstName" placeholder="Ім’я"></label>
+          <label>Прізвище<input required id="lastName" name="lastName" placeholder="Прізвище"></label>
+          <label>Телефон<input required id="phone" name="phone" placeholder="+380"></label>
           <label>Місто НП
-            <select required id="coCity" name="npCity"></select>
+            <select required id="city" name="npCity"></select>
             <div class="branch-search"><input type="search" id="coCitySearch" placeholder="Пошук міста"></div>
           </label>
           <label>Відділення / поштомат НП
-            <select required id="coBranch" name="npBranch"></select>
+            <select required id="warehouse" name="npBranch"></select>
             <div class="branch-search"><input type="search" id="coBranchSearch" placeholder="Пошук відділення або поштомату"></div>
           </label>
           <div>
             <p style="margin:0 0 6px;color:var(--muted);font-size:14px">Оплата</p>
-            <label style="display:flex;gap:8px;align-items:center"><input type="radio" name="payment" value="cod" checked> Післяплата</label>
-            <label style="display:flex;gap:8px;align-items:center"><input type="radio" name="payment" value="full"> За реквізитами (Mono/Приват)</label>
+            <label style="display:flex;gap:8px;align-items:center"><input id="paymentCod" type="radio" name="payment" value="cod" checked> Післяплата</label>
+            <label style="display:flex;gap:8px;align-items:center"><input id="paymentFull" type="radio" name="payment" value="full"> За реквізитами (Mono/Приват)</label>
             <div class="checkout-payment-note" id="coPaymentNote">IBAN: UA11 1234 5678 9012 3456 7890 1234 (Mono). Отримувач: MI_STORE.</div>
           </div>
-          <label>Коментар<textarea name="comment" rows="2" placeholder="Побажання щодо кольору, часу дзвінка..."></textarea></label>
+          <label>Коментар<textarea id="comment" name="comment" rows="2" placeholder="Побажання щодо кольору, часу дзвінка..."></textarea></label>
         </div>
         <div class="modal-actions">
           <button class="btn btn-primary" type="submit">Підтвердити замовлення</button>
@@ -99,5 +99,6 @@
 </main>
 
 <script src="js/main.js"></script>
+<script src="js/checkout.js"></script>
 </body>
 </html>

@@ -1550,9 +1550,9 @@ function bootCheckoutPage(){
     piecesEl:document.querySelector('[data-co-pieces]'),
     pricePackEl:document.querySelector('[data-co-price]'),
     totalEl:document.querySelector('[data-co-total]'),
-    citySelect:document.querySelector('#coCity'),
+    citySelect:document.querySelector('#city'),
     citySearch:document.querySelector('#coCitySearch'),
-    branchSelect:document.querySelector('#coBranch'),
+    branchSelect:document.querySelector('#warehouse'),
     branchSearch:document.querySelector('#coBranchSearch'),
     form:document.querySelector('#checkoutForm'),
     paymentNote:document.querySelector('#coPaymentNote')
@@ -1591,21 +1591,6 @@ function bootCheckoutPage(){
     CHECKOUT_REFS.qtyPlus.addEventListener('click', () => {
       CHECKOUT_STATE.packs = CHECKOUT_STATE.packs + 1;
       syncCheckoutSummary();
-    });
-  }
-  if(CHECKOUT_REFS.form){
-    CHECKOUT_REFS.form.addEventListener('submit', evt => {
-      evt.preventDefault();
-      const fd = new FormData(CHECKOUT_REFS.form);
-      const packSize = normalizePackSize(product, CHECKOUT_STATE.packSize);
-      const packs = Math.max(1, CHECKOUT_STATE.packs);
-      const totalPieces = packSize * packs;
-      const totalPrice = getPackPrice(product, packSize) * packs;
-      const payment = fd.get('payment') === 'full' ? 'Повна оплата' : 'Післяплата';
-      const summary = `ЗАМОВЛЕННЯ MI_STORE\nМодель: ${product.name}\nРозмір: ${CHECKOUT_STATE.size}\nКомплектів: ${packs} (по ${packSize} шт)\nВсього штук: ${totalPieces}\nСума: ${formatCurrency(totalPrice)} без доставки\n—\nІм’я: ${fd.get('firstName')} ${fd.get('lastName')}\nТелефон: ${fd.get('phone')}\nМісто: ${fd.get('npCity')}\nВідділення: ${fd.get('npBranch')}\nОплата: ${payment}\nКоментар: ${fd.get('comment') || ''}`;
-      copy(summary);
-      alert('Заявку скопійовано у буфер. Встав у Instagram/Telegram.');
-      CHECKOUT_REFS.form.reset();
     });
   }
   const paymentRadios = $$('input[name=\"payment\"]');
@@ -2074,6 +2059,3 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
 });
-
-
-
