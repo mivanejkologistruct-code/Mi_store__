@@ -15,6 +15,8 @@ const COMPOSITION_V2 = 'Склад: 88% поліамід, 12% еластан · 
 const COMPOSITION_V395 = 'Склад: 95% бавовна, 5% еластан — максимально м’які';
 const COMPOSITION_THERMO = 'Склад: 62% бавовна, 30% поліестер, 8% еластан — утеплений шар для холоду';
 const VERICOH_DETAIL = 'Vericoh шиє базу та преміум лінійки на фабриці в Гуандуні. Плоскі шви, м’який пояс, еластан до 12% — тканина не перекручується, зберігає форму після прання і не тисне в русі.';
+const CHECKOUT_WEBHOOK_URL = 'https://script.google.com/macros/s/AKfycbwAxBt37K-rcJOz7TjAg9dZB5xBYrl-uwOuhERKjAO_adsnqedFfYR0c8oDiPObRU6D/exec';
+const CHECKOUT_WEBHOOK_TOKEN = 'SECRET_TOKEN';
 const numberFormatter = new Intl.NumberFormat('uk-UA');
 const formatCurrency = value => `${numberFormatter.format(Math.round(value || 0))} грн`;
 const formatNumber = value => numberFormatter.format(Math.round(value || 0));
@@ -1591,6 +1593,63 @@ function bootCheckoutPage(){
     CHECKOUT_REFS.qtyPlus.addEventListener('click', () => {
       CHECKOUT_STATE.packs = CHECKOUT_STATE.packs + 1;
       syncCheckoutSummary();
+    });
+  }
+  if(CHECKOUT_REFS.form){
+    CHECKOUT_REFS.form.addEventListener('submit', evt => {
+      evt.preventDefault();
+      const fd = new FormData(CHECKOUT_REFS.form);
+      const packSize = normalizePackSize(product, CHECKOUT_STATE.packSize);
+      const packs = Math.max(1, CHECKOUT_STATE.packs);
+      const totalPrice = getPackPrice(product, packSize) * packs;
+      const payment = fd.get('payment') === 'full' ? 'Повна оплата' : 'Післяплата';
+      const firstName = String(fd.get('firstName') || '').trim();
+      const lastName = String(fd.get('lastName') || '').trim();
+      const phone = String(fd.get('phone') || '').trim();
+      const city = String(fd.get('npCity') || '').trim();
+      const warehouse = String(fd.get('npBranch') || '').trim();
+      const comment = String(fd.get('comment') || '').trim();
+
+      if(!phone || !city || !warehouse){
+        alert('Будь ласка, заповніть телефон, місто та відділення Нової пошти.');
+        return;
+      }
+
+      const payload = new URLSearchParams({
+        token: CHECKOUT_WEBHOOK_TOKEN,
+        product: product.name || '',
+        size: CHECKOUT_STATE.size || '',
+        qty: String(packs),
+        price: String(totalPrice),
+        firstName,
+        lastName,
+        phone,
+        city,
+        warehouse,
+        payment,
+        comment,
+        source: 'github_pages',
+        status: 'NEW'
+      });
+
+      fetch(CHECKOUT_WEBHOOK_URL, {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: {'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8'},
+        body: payload.toString()
+      })
+        .then(() => {
+          alert('Замовлення відправлено ✅');
+          CHECKOUT_REFS.form.reset();
+          sessionStorage.removeItem('mi_checkout');
+          CHECKOUT_STATE.packs = 1;
+          CHECKOUT_STATE.packSize = getDefaultPackSize(product);
+          CHECKOUT_STATE.size = firstAvailableSize(product) || product.sizes[0] || '';
+          syncCheckoutSummary();
+        })
+        .catch(() => {
+          alert('Не вдалося відправити замовлення. Спробуйте ще раз.');
+        });
     });
   }
   const paymentRadios = $$('input[name=\"payment\"]');
