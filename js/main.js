@@ -1552,9 +1552,9 @@ function bootCheckoutPage(){
     piecesEl:document.querySelector('[data-co-pieces]'),
     pricePackEl:document.querySelector('[data-co-price]'),
     totalEl:document.querySelector('[data-co-total]'),
-    citySelect:document.querySelector('#coCity'),
+    citySelect:document.querySelector('#city'),
     citySearch:document.querySelector('#coCitySearch'),
-    branchSelect:document.querySelector('#coBranch'),
+    branchSelect:document.querySelector('#warehouse'),
     branchSearch:document.querySelector('#coBranchSearch'),
     form:document.querySelector('#checkoutForm'),
     paymentNote:document.querySelector('#coPaymentNote')
