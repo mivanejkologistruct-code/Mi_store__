@@ -1,104 +1,117 @@
-<!doctype html>
-<html lang="uk">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Оформлення — MI_STORE</title>
-  <link rel="stylesheet" href="css/style.css" />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
-</head>
-<body>
-<header class="header">
-  <div class="container row">
-    <a class="brand" id="brandClick" href="index.html">
-      <div class="logo"><img src="images/logo.png" alt="MI_STORE"><small>MI_STORE</small></div>
-      <div class="tag">чоловіча білизна</div>
-    </a>
-    <nav class="nav">
-      <a href="index.html#homeCatalog">Каталог</a>
-      <a href="index.html#mustHave">MUST HAVE</a>
-      <a href="index.html#about">Про нас</a>
-    </nav>
-    <a class="cart-link" href="checkout.html" aria-label="Кошик">🛒</a>
-  </div>
-</header>
+(() => {
+  // ✅ ТВОЇ НАЛАШТУВАННЯ
+  const WEBHOOK_URL =
+    "https://script.google.com/macros/s/AKfycbwAxBt37K-rcJOz7TjAg9dZB5xBYrl-uwOuhERKjAO_adsnqedFfYR0c8oDiPObRU6D/exec";
+  const TOKEN = "MI_STORE_TOKEN_123";
 
-<main class="container card checkout-page reveal" data-checkout>
-  <div class="section-header">
-    <h1 class="section-title">Оформлення замовлення</h1>
-    <span class="price-tag">Новою поштою по Україні</span>
-  </div>
+  const form = document.getElementById("checkoutForm");
+  if (!form) return;
 
-  <div class="checkout-grid">
-    <section class="checkout-summary">
-      <div class="checkout-product">
-        <div class="checkout-img">
-          <img data-co-img alt="Товар">
-        </div>
-        <div class="checkout-info">
-          <p class="product-brand" data-co-meta>MI_STORE</p>
-          <h3 data-co-name>Товар</h3>
-          <div class="checkout-meta-line">
-            <label>Розмір
-              <select id="coSize"></select>
-            </label>
-            <label>Комплект
-              <select id="coPack"></select>
-            </label>
-          </div>
-          <div class="qty-control">
-            <button type="button" data-co-minus>−</button>
-            <div class="qty-readout">
-              <strong data-co-qty>1 комплект</strong>
-              <small data-co-pieces>4 шт</small>
-            </div>
-            <button type="button" data-co-plus>+</button>
-          </div>
-          <div class="checkout-total-line">
-            <span>Ціна за комплект</span>
-            <strong data-co-price>— грн</strong>
-          </div>
-          <div class="checkout-total-line total">
-            <span>До оплати (без доставки)</span>
-            <strong data-co-total>— грн</strong>
-          </div>
-        </div>
-      </div>
-    </section>
+  // Захист від подвійного підключення/подвійного submit-хендлера
+  if (window.__MI_STORE_CHECKOUT_BOUND__) return;
+  window.__MI_STORE_CHECKOUT_BOUND__ = true;
 
-    <section class="checkout-form-wrap">
-      <h3>Дані для доставки</h3>
-      <form id="checkoutForm" class="checkout-form">
-        <div class="form-grid">
-          <label>Ім’я<input required id="firstName" name="firstName" placeholder="Ім’я"></label>
-          <label>Прізвище<input required id="lastName" name="lastName" placeholder="Прізвище"></label>
-          <label>Телефон<input required id="phone" name="phone" placeholder="+380"></label>
-          <label>Місто НП
-            <select required id="city" name="npCity"></select>
-            <div class="branch-search"><input type="search" id="coCitySearch" placeholder="Пошук міста"></div>
-          </label>
-          <label>Відділення / поштомат НП
-            <select required id="warehouse" name="npBranch"></select>
-            <div class="branch-search"><input type="search" id="coBranchSearch" placeholder="Пошук відділення або поштомату"></div>
-          </label>
-          <div>
-            <p style="margin:0 0 6px;color:var(--muted);font-size:14px">Оплата</p>
-            <label style="display:flex;gap:8px;align-items:center"><input id="paymentCod" type="radio" name="payment" value="cod" checked> Післяплата</label>
-            <label style="display:flex;gap:8px;align-items:center"><input id="paymentFull" type="radio" name="payment" value="full"> За реквізитами (Mono/Приват)</label>
-            <div class="checkout-payment-note" id="coPaymentNote">IBAN: UA11 1234 5678 9012 3456 7890 1234 (Mono). Отримувач: MI_STORE.</div>
-          </div>
-          <label>Коментар<textarea id="comment" name="comment" rows="2" placeholder="Побажання щодо кольору, часу дзвінка..."></textarea></label>
-        </div>
-        <div class="modal-actions">
-          <button class="btn btn-primary" type="submit">Підтвердити замовлення</button>
-          <a class="btn btn-ghost" href="index.html#homeCatalog">← Назад до каталогу</a>
-        </div>
-      </form>
-    </section>
-  </div>
-</main>
+  const $ = (sel) => document.querySelector(sel);
+  const val = (id) => (document.getElementById(id)?.value ?? "").trim();
 
-<script src="js/main.js"></script>
-<script src="js/checkout.js"></script>
-</body>
-</html>
+  function getPayment() {
+    const checked = document.querySelector('input[name="payment"]:checked');
+    if (!checked) return "";
+    return checked.value === "cod" ? "Післяплата" : "За реквізитами";
+  }
+
+  function getProductFromDOM() {
+    const name = $('[data-co-name]')?.textContent?.trim() || "";
+    const meta = $('[data-co-meta]')?.textContent?.trim() || "";
+    const size = document.getElementById("coSize")?.value || "";
+    const pack = document.getElementById("coPack")?.value || "";
+    const qtyText = $('[data-co-qty]')?.textContent?.trim() || "";      // напр: "1 комплект"
+    const piecesText = $('[data-co-pieces]')?.textContent?.trim() || ""; // напр: "4 шт"
+    const priceText = $('[data-co-price]')?.textContent?.trim() || "";   // напр: "850 грн"
+    const totalText = $('[data-co-total]')?.textContent?.trim() || "";
+
+    // витягнути число з "850 грн"
+    const price = (priceText.match(/\d+/g) || []).join("") || "";
+    const total = (totalText.match(/\d+/g) || []).join("") || "";
+
+    return {
+      product: [meta, name].filter(Boolean).join(" ").trim(),
+      size,
+      qty: qtyText || "",
+      pack: pack || "",
+      pieces: piecesText || "",
+      price,
+      total
+    };
+  }
+
+  async function sendOrder(payload) {
+    const body = new URLSearchParams(payload).toString();
+
+    // ВАЖЛИВО: GitHub Pages + Apps Script -> no-cors (відповідь не читаємо)
+    await fetch(WEBHOOK_URL, {
+      method: "POST",
+      mode: "no-cors",
+      headers: { "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8" },
+      body
+    });
+  }
+
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+
+    // 1) Зчитуємо поля доставки
+    const firstName = val("firstName");
+    const lastName = val("lastName");
+    const phone = val("phone");
+    const city = document.getElementById("city")?.value || "";
+    const warehouse = document.getElementById("warehouse")?.value || "";
+    const comment = val("comment");
+    const payment = getPayment();
+
+    // 2) Мінімальна валідація (критичні поля)
+    if (!phone) return alert("Вкажи телефон 🙂");
+    if (!city) return alert("Обери місто Нової Пошти 🙂");
+    if (!warehouse) return alert("Обери відділення/поштомат 🙂");
+
+    // 3) Дані товару з DOM (бо main.js їх підставляє)
+    const p = getProductFromDOM();
+
+    // 4) Payload у Apps Script
+    const payload = {
+      token: TOKEN,
+      product: p.product,
+      size: p.size,
+      qty: p.qty,
+      price: p.price || p.total, // якщо раптом price порожній
+      firstName,
+      lastName,
+      phone,
+      city,
+      warehouse,
+      payment,
+      comment: [
+        comment,
+        p.pack ? `Комплект: ${p.pack}` : "",
+        p.pieces ? `Штук: ${p.pieces}` : ""
+      ].filter(Boolean).join(" | "),
+      source: "github_pages",
+      status: "NEW"
+    };
+
+    // 5) Відправка
+    try {
+      // для швидкої діагностики в консолі
+      console.log("SENDING ORDER:", payload);
+
+      await sendOrder(payload);
+
+      alert("Замовлення відправлено ✅");
+      form.reset();
+      // якщо треба — можеш чистити кошик тут (пізніше зробимо)
+    } catch (err) {
+      console.error(err);
+      alert("Не вдалося відправити ❌ Спробуй ще раз.");
+    }
+  });
+})();
