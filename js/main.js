@@ -19,6 +19,8 @@ const VERICOH_DETAIL = 'Vericoh шиє базу та преміум лінійк
 const SHEETS_WEB_APP_URL = '';
 const SHEETS_WEB_APP_STORAGE_KEY = 'mi_sheets_web_app_url';
 const SHEETS_WEB_APP_TIMEOUT = 8000;
+const SHEETS_WEB_APP_TOKEN = '';
+const SHEETS_WEB_APP_TOKEN_STORAGE_KEY = 'mi_sheets_web_app_token';
 const numberFormatter = new Intl.NumberFormat('uk-UA');
 const formatCurrency = value => `${numberFormatter.format(Math.round(value || 0))} грн`;
 const formatNumber = value => numberFormatter.format(Math.round(value || 0));
@@ -276,6 +278,19 @@ const debounce = (fn, delay=260) => {
   };
 };
 
+function preventFormEnterSubmit(form){
+  if(!form) return;
+  form.addEventListener('keydown', evt => {
+    if(evt.key !== 'Enter') return;
+    const target = evt.target;
+    if(!target) return;
+    const tag = target.tagName;
+    if(tag === 'TEXTAREA') return;
+    if(target.type === 'submit') return;
+    evt.preventDefault();
+  });
+}
+
 function getSheetsWebAppUrl(){
   if(typeof window !== 'undefined' && window.GSHEETS_WEB_APP_URL){
     return String(window.GSHEETS_WEB_APP_URL).trim();
@@ -289,39 +304,67 @@ function getSheetsWebAppUrl(){
   return SHEETS_WEB_APP_URL;
 }
 
+function getSheetsWebAppToken(){
+  if(typeof window !== 'undefined' && window.GSHEETS_WEB_APP_TOKEN){
+    return String(window.GSHEETS_WEB_APP_TOKEN).trim();
+  }
+  try{
+    const stored = localStorage.getItem(SHEETS_WEB_APP_TOKEN_STORAGE_KEY);
+    if(stored) return stored.trim();
+  }catch(_){
+    /* ignore */
+  }
+  return SHEETS_WEB_APP_TOKEN;
+}
+
+function buildSheetsFields(payload){
+  const token = getSheetsWebAppToken();
+  const packs = Number(payload.packs || payload.qty || 0);
+  const packSize = Number(payload.packSize || 0);
+  const qty = payload.qty
+    || (packs && packSize ? `${packs} x ${packSize}` : '')
+    || (packs ? String(packs) : '');
+  return {
+    token,
+    product: payload.productName || payload.product || '',
+    size: payload.size || '',
+    qty,
+    price: payload.totalPrice || payload.price || '',
+    firstName: payload.firstName || '',
+    lastName: payload.lastName || '',
+    phone: payload.phone || '',
+    city: payload.npCity || payload.city || '',
+    warehouse: payload.npBranch || payload.warehouse || '',
+    payment: payload.payment || '',
+    comment: payload.comment || '',
+    source: payload.source || 'site',
+    status: payload.status || 'NEW'
+  };
+}
+
 async function postToSheets(payload){
   const url = getSheetsWebAppUrl();
   if(!url) return {status:'missing'};
-  const body = new URLSearchParams(payload).toString();
-  const controller = typeof AbortController === 'function' ? new AbortController() : null;
-  let timeoutId = null;
-  if(controller){
-    timeoutId = setTimeout(() => controller.abort(), SHEETS_WEB_APP_TIMEOUT);
+  const fields = buildSheetsFields(payload);
+  if(!fields.token) return {status:'missing-token'};
+  fields.ts = Date.now();
+  const qs = new URLSearchParams(fields).toString();
+  const urlWithParams = `${url}${url.includes('?') ? '&' : '?'}${qs}`;
+  if(typeof Image === 'function'){
+    const img = new Image();
+    img.referrerPolicy = 'no-referrer';
+    img.src = urlWithParams;
+    return {status:'queued'};
   }
   try{
-    const res = await fetch(url, {
-      method:'POST',
-      headers:{'Content-Type':'application/x-www-form-urlencoded;charset=UTF-8'},
-      body,
-      signal: controller ? controller.signal : undefined
+    await fetch(urlWithParams, {
+      method:'GET',
+      mode:'no-cors',
+      keepalive:true
     });
-    if(timeoutId) clearTimeout(timeoutId);
-    if(res.ok) return {status:'ok'};
-    const text = await res.text();
-    return {status:'error', error:new Error(text || 'Sheets request failed')};
+    return {status:'queued'};
   }catch(err){
-    if(timeoutId) clearTimeout(timeoutId);
-    try{
-      await fetch(url, {
-        method:'POST',
-        mode:'no-cors',
-        headers:{'Content-Type':'application/x-www-form-urlencoded;charset=UTF-8'},
-        body
-      });
-      return {status:'ok'};
-    }catch(_){
-      return {status:'error', error:err};
-    }
+    return {status:'error', error:err};
   }
 }
 
@@ -418,6 +461,14 @@ function setupNovaPoshtaSelects(refs){
   const {citySelect, branchSelect, citySearch, branchSearch} = refs;
   if(!citySelect || !branchSelect) return;
   const apiKey = getNovaPoshtaApiKey();
+  const blockEnter = input => {
+    if(!input) return;
+    input.addEventListener('keydown', evt => {
+      if(evt.key === 'Enter') evt.preventDefault();
+    });
+  };
+  blockEnter(citySearch);
+  blockEnter(branchSearch);
 
   const renderStaticCities = term => {
     const search = (term || '').trim().toLowerCase();
@@ -1480,6 +1531,7 @@ function bootOrderDrawer(){
   const modal = $('#drawerCheckoutModal');
   const form = $('#drawerCheckoutForm');
   if(!drawer || !overlay || !sizeSelect || !modal || !form) return;
+  preventFormEnterSubmit(form);
   drawer.setAttribute('tabindex','-1');
   ORDER_DRAWER_REFS = {
     drawer,
@@ -1539,8 +1591,7 @@ function bootOrderDrawer(){
     });
   }
   modal.addEventListener('click', evt => {
-    const r = modal.getBoundingClientRect();
-    if(evt.clientY < r.top || evt.clientY > r.bottom || evt.clientX < r.left || evt.clientX > r.right){
+    if(evt.target === modal){
       safeCloseDialog(modal, 'cancel');
     }
   });
@@ -1591,12 +1642,14 @@ function bootOrderDrawer(){
     if(submitBtn) submitBtn.disabled = false;
     if(submitBtn) submitBtn.textContent = submitLabel;
     copy(summary);
-    if(result.status === 'ok'){
-      alert('Заявку відправлено. Дані також скопійовано у буфер.');
-    }else if(result.status === 'missing'){
+    if(result.status === 'missing'){
       alert('Заявку скопійовано у буфер. Додай URL Apps Script Web App, щоб писати в Google Sheets.');
-    }else{
+    }else if(result.status === 'missing-token'){
+      alert('Заявку скопійовано у буфер. Додай token Apps Script, щоб писати в Google Sheets.');
+    }else if(result.status === 'error'){
       alert('Не вдалося відправити заявку. Дані скопійовано у буфер.');
+    }else{
+      alert('Заявку відправлено. Якщо у Sheets немає рядка — перевір доступ Web App і token. Дані також скопійовано у буфер.');
     }
     form.reset();
     closeOrderDrawer();
@@ -1674,6 +1727,7 @@ function bootCheckoutPage(){
     form:document.querySelector('#checkoutForm'),
     paymentNote:document.querySelector('#coPaymentNote')
   };
+  preventFormEnterSubmit(CHECKOUT_REFS.form);
   const payload = loadCheckoutPayload();
   const product = payload ? (STATE.products.find(p => p.id === payload.id) || STATE.products[0]) : STATE.products[0];
   if(!product){
@@ -1711,12 +1765,14 @@ function bootCheckoutPage(){
     });
   }
   if(CHECKOUT_REFS.form){
-    CHECKOUT_REFS.form.addEventListener('submit', evt => {
+    CHECKOUT_REFS.form.addEventListener('submit', async evt => {
       evt.preventDefault();
       const fd = new FormData(CHECKOUT_REFS.form);
       const packSize = normalizePackSize(product, CHECKOUT_STATE.packSize);
       const packs = Math.max(1, CHECKOUT_STATE.packs);
-      const totalPrice = getPackPrice(product, packSize) * packs;
+      const totalPieces = packSize * packs;
+      const pricePerPack = getPackPrice(product, packSize);
+      const totalPrice = pricePerPack * packs;
       const payment = fd.get('payment') === 'full' ? 'Повна оплата' : 'Післяплата';
       const firstName = String(fd.get('firstName') || '').trim();
       const lastName = String(fd.get('lastName') || '').trim();
@@ -1730,41 +1786,52 @@ function bootCheckoutPage(){
         return;
       }
 
-      const payload = new URLSearchParams({
-        token: CHECKOUT_WEBHOOK_TOKEN,
-        product: product.name || '',
-        size: CHECKOUT_STATE.size || '',
-        qty: String(packs),
-        price: String(totalPrice),
+      const summary = `ЗАМОВЛЕННЯ MI_STORE\nМодель: ${product.name}\nРозмір: ${CHECKOUT_STATE.size}\nКомплектів: ${packs} (по ${packSize} шт)\nВсього штук: ${totalPieces}\nСума: ${formatCurrency(totalPrice)} без доставки\n—\nІм’я: ${firstName} ${lastName}\nТелефон: ${phone}\nМісто: ${city}\nВідділення: ${warehouse}\nОплата: ${payment}\nКоментар: ${comment}`;
+      const payload = {
+        source:'checkout-page',
+        createdAt:new Date().toISOString(),
+        orderId:String(Date.now()),
+        productId:product.id,
+        productName:product.name,
+        brand:product.brand,
+        size:CHECKOUT_STATE.size || '',
+        packSize:String(packSize),
+        packs:String(packs),
+        totalPieces:String(totalPieces),
+        pricePerPack:String(pricePerPack),
+        totalPrice:String(totalPrice),
         firstName,
         lastName,
         phone,
-        city,
-        warehouse,
+        npCity:city,
+        npBranch:warehouse,
         payment,
         comment,
-        source: 'github_pages',
-        status: 'NEW'
-      });
-
-      fetch(CHECKOUT_WEBHOOK_URL, {
-        method: 'POST',
-        mode: 'no-cors',
-        headers: {'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8'},
-        body: payload.toString()
-      })
-        .then(() => {
-          alert('Замовлення відправлено ✅');
-          CHECKOUT_REFS.form.reset();
-          sessionStorage.removeItem('mi_checkout');
-          CHECKOUT_STATE.packs = 1;
-          CHECKOUT_STATE.packSize = getDefaultPackSize(product);
-          CHECKOUT_STATE.size = firstAvailableSize(product) || product.sizes[0] || '';
-          syncCheckoutSummary();
-        })
-        .catch(() => {
-          alert('Не вдалося відправити замовлення. Спробуйте ще раз.');
-        });
+        page:location.href
+      };
+      const submitBtn = CHECKOUT_REFS.form.querySelector('button[type="submit"]');
+      const submitLabel = submitBtn ? submitBtn.textContent : '';
+      if(submitBtn) submitBtn.disabled = true;
+      if(submitBtn) submitBtn.textContent = 'Відправляємо...';
+      const result = await postToSheets(payload);
+      if(submitBtn) submitBtn.disabled = false;
+      if(submitBtn) submitBtn.textContent = submitLabel;
+      copy(summary);
+      if(result.status === 'missing'){
+        alert('Заявку скопійовано у буфер. Додай URL Apps Script Web App, щоб писати в Google Sheets.');
+      }else if(result.status === 'missing-token'){
+        alert('Заявку скопійовано у буфер. Додай token Apps Script, щоб писати в Google Sheets.');
+      }else if(result.status === 'error'){
+        alert('Не вдалося відправити заявку. Дані скопійовано у буфер.');
+      }else{
+        alert('Заявку відправлено. Якщо у Sheets немає рядка — перевір доступ Web App і token. Дані також скопійовано у буфер.');
+      }
+      CHECKOUT_REFS.form.reset();
+      sessionStorage.removeItem('mi_checkout');
+      CHECKOUT_STATE.packs = 1;
+      CHECKOUT_STATE.packSize = getDefaultPackSize(product);
+      CHECKOUT_STATE.size = firstAvailableSize(product) || product.sizes[0] || '';
+      syncCheckoutSummary();
     });
   }
   const paymentRadios = $$('input[name=\"payment\"]');
