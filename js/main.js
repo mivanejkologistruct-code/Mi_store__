@@ -142,6 +142,15 @@ const NOVA_POSHTA_LOCATIONS = [
 const NOVA_POSHTA_API_URL = 'https://api.novaposhta.ua/v2.0/json/';
 const NOVA_POSHTA_API_STORAGE_KEY = 'mi_np_api_key';
 const NOVA_POSHTA_CACHE = {cities:new Map(), warehouses:new Map()};
+const NOVA_POSHTA_PROXY_TIMEOUT = 12000;
+const NOVA_POSHTA_WAREHOUSE_LIMIT = 200;
+const NOVA_POSHTA_WAREHOUSE_PAGE_LIMIT = 10;
+const DELIVERY_TYPE_DEFAULT = 'branch';
+const DELIVERY_TYPE_LABELS = {
+  branch:'Відділення',
+  postomat:'Поштомат',
+  courier:'Курʼєр'
+};
 
 const ORDER_DRAWER_STATE = {product:null, size:'', packs:1, packSize:PACK_DEFAULT};
 let ORDER_DRAWER_REFS = null;
@@ -278,6 +287,59 @@ const debounce = (fn, delay=260) => {
   };
 };
 
+const normalizeDeliveryType = value => (DELIVERY_TYPE_LABELS[value] ? value : DELIVERY_TYPE_DEFAULT);
+const getDeliveryTypeLabel = value => DELIVERY_TYPE_LABELS[normalizeDeliveryType(value)] || DELIVERY_TYPE_LABELS[DELIVERY_TYPE_DEFAULT];
+const isPostomatName = name => String(name || '').toLowerCase().includes('поштомат');
+const normalizeWarehouseCategory = value => {
+  const key = String(value || '').toLowerCase();
+  if(key.includes('postomat') || key.includes('поштомат')) return 'postomat';
+  if(key.includes('branch') || key.includes('відділення') || key.includes('department')) return 'branch';
+  return '';
+};
+const getWarehouseCategory = item => {
+  if(!item) return '';
+  const direct = normalizeWarehouseCategory(item.CategoryOfWarehouse);
+  if(direct) return direct;
+  const typeDesc = normalizeWarehouseCategory(item.TypeOfWarehouseDescription || item.TypeOfWarehouse);
+  if(typeDesc) return typeDesc;
+  if(isPostomatName(item.Description || item.DescriptionRu)) return 'postomat';
+  return 'branch';
+};
+const filterBranchesByDeliveryType = (branches, deliveryType) => {
+  if(deliveryType === 'postomat') return branches.filter(isPostomatName);
+  if(deliveryType === 'branch') return branches.filter(branch => !isPostomatName(branch));
+  return [];
+};
+const filterWarehouseItemsByDeliveryType = (items, deliveryType) => {
+  if(deliveryType === 'postomat') return items.filter(item => getWarehouseCategory(item) === 'postomat');
+  if(deliveryType === 'branch') return items.filter(item => getWarehouseCategory(item) === 'branch');
+  return [];
+};
+const getBranchEmptyLabel = deliveryType => (deliveryType === 'postomat' ? 'Поштомати не знайдені' : 'Відділення не знайдені');
+const getDeliveryTypeFromInputs = inputs => {
+  if(!inputs || !inputs.length) return DELIVERY_TYPE_DEFAULT;
+  const selected = inputs.find(input => input.checked);
+  return normalizeDeliveryType(selected ? selected.value : inputs[0].value);
+};
+const setDeliveryTypeActive = inputs => {
+  if(!inputs || !inputs.length) return;
+  inputs.forEach(input => {
+    const label = input.closest('.delivery-option');
+    if(label) label.classList.toggle('is-active', input.checked);
+  });
+};
+const buildCourierAddress = form => {
+  if(!form) return '';
+  const street = String(form.querySelector('[name="courierStreet"]')?.value || '').trim();
+  const house = String(form.querySelector('[name="courierHouse"]')?.value || '').trim();
+  const apartment = String(form.querySelector('[name="courierApartment"]')?.value || '').trim();
+  const parts = [];
+  if(street) parts.push(street);
+  if(house) parts.push(`буд. ${house}`);
+  if(apartment) parts.push(`кв. ${apartment}`);
+  return parts.join(', ');
+};
+
 function preventFormEnterSubmit(form){
   if(!form) return;
   form.addEventListener('keydown', evt => {
@@ -379,12 +441,80 @@ function getNovaPoshtaApiKey(){
   }
 }
 
+function getNovaPoshtaProxyUrl(){
+  if(typeof window !== 'undefined' && window.NOVA_POSHTA_PROXY_URL){
+    return String(window.NOVA_POSHTA_PROXY_URL).trim();
+  }
+  if(typeof window !== 'undefined' && window.GSHEETS_WEB_APP_URL){
+    return String(window.GSHEETS_WEB_APP_URL).trim();
+  }
+  return '';
+}
+
+function novaPoshtaProxyRequest(modelName, calledMethod, methodProperties){
+  const proxyUrl = getNovaPoshtaProxyUrl();
+  if(!proxyUrl) return Promise.reject(new Error('Nova Poshta proxy URL missing'));
+  const callbackName = `npCallback_${Date.now()}_${Math.random().toString(36).slice(2,8)}`;
+  return new Promise((resolve, reject) => {
+    let done = false;
+    let script = null;
+    const cleanup = () => {
+      if(done) return;
+      done = true;
+      try{ delete window[callbackName]; }catch(_){}
+      if(script && script.parentNode) script.parentNode.removeChild(script);
+      if(timeoutId) clearTimeout(timeoutId);
+    };
+    const timeoutId = setTimeout(() => {
+      cleanup();
+      reject(new Error('Nova Poshta proxy timeout'));
+    }, NOVA_POSHTA_PROXY_TIMEOUT);
+    window[callbackName] = payload => {
+      cleanup();
+      if(payload && payload.success){
+        resolve(payload.data || []);
+        return;
+      }
+      const err = (payload && payload.errors && payload.errors.length)
+        ? payload.errors.join(', ')
+        : 'Nova Poshta proxy error';
+      reject(new Error(err));
+    };
+    const params = new URLSearchParams({
+      action:'np',
+      callback:callbackName,
+      modelName,
+      calledMethod,
+      methodProperties: JSON.stringify(methodProperties || {})
+    });
+    script = document.createElement('script');
+    script.async = true;
+    script.src = `${proxyUrl}${proxyUrl.includes('?') ? '&' : '?'}${params.toString()}`;
+    script.onerror = () => {
+      cleanup();
+      reject(new Error('Nova Poshta proxy failed'));
+    };
+    const target = document.head || document.body;
+    if(!target){
+      cleanup();
+      reject(new Error('Nova Poshta proxy target missing'));
+      return;
+    }
+    target.appendChild(script);
+  });
+}
+
 async function novaPoshtaRequest(modelName, calledMethod, methodProperties){
+  const proxyUrl = getNovaPoshtaProxyUrl();
+  if(proxyUrl){
+    const data = await novaPoshtaProxyRequest(modelName, calledMethod, methodProperties);
+    return data || [];
+  }
   const apiKey = getNovaPoshtaApiKey();
-  if(!apiKey) throw new Error('Nova Poshta API key missing');
+  if(!apiKey) throw new Error('Nova Poshta API key or proxy missing');
   const res = await fetch(NOVA_POSHTA_API_URL, {
     method:'POST',
-    headers:{'Content-Type':'application/json'},
+    headers:{'Content-Type':'application/json;charset=UTF-8'},
     body:JSON.stringify({apiKey, modelName, calledMethod, methodProperties})
   });
   const data = await res.json();
@@ -408,13 +538,24 @@ async function fetchNovaPoshtaCities(term){
 async function fetchNovaPoshtaWarehouses(cityRef, cityName, term){
   const cacheKey = `${cityRef || cityName || ''}::${(term || '').trim().toLowerCase()}`;
   if(NOVA_POSHTA_CACHE.warehouses.has(cacheKey)) return NOVA_POSHTA_CACHE.warehouses.get(cacheKey);
-  const props = {Limit:200};
-  if(cityRef) props.CityRef = cityRef;
-  else if(cityName) props.CityName = cityName;
-  if(term) props.FindByString = term;
-  const data = await novaPoshtaRequest('Address', 'getWarehouses', props);
-  NOVA_POSHTA_CACHE.warehouses.set(cacheKey, data);
-  return data;
+  const baseProps = {Limit:NOVA_POSHTA_WAREHOUSE_LIMIT};
+  if(cityRef) baseProps.CityRef = cityRef;
+  else if(cityName) baseProps.CityName = cityName;
+  if(term) baseProps.FindByString = term;
+  const all = [];
+  let page = 1;
+  while(true){
+    const props = {...baseProps, Page:page};
+    const data = await novaPoshtaRequest('Address', 'getWarehouses', props);
+    if(!data.length) break;
+    all.push(...data);
+    if(term) break;
+    if(data.length < NOVA_POSHTA_WAREHOUSE_LIMIT) break;
+    if(page >= NOVA_POSHTA_WAREHOUSE_PAGE_LIMIT) break;
+    page += 1;
+  }
+  NOVA_POSHTA_CACHE.warehouses.set(cacheKey, all);
+  return all;
 }
 
 function renderCityOptions(citySelect, cities){
@@ -438,11 +579,11 @@ function renderCityOptions(citySelect, cities){
   });
 }
 
-function renderBranchOptions(branchSelect, branches){
+function renderBranchOptions(branchSelect, branches, emptyLabel = 'Відділення не знайдені'){
   branchSelect.innerHTML = '';
   if(!branches.length){
     const empty = document.createElement('option');
-    empty.textContent = 'Відділення не знайдені';
+    empty.textContent = emptyLabel;
     empty.disabled = true;
     branchSelect.appendChild(empty);
     return;
@@ -458,9 +599,22 @@ function renderBranchOptions(branchSelect, branches){
 
 function setupNovaPoshtaSelects(refs){
   if(!refs) return;
-  const {citySelect, branchSelect, citySearch, branchSearch} = refs;
+  const {
+    citySelect,
+    branchSelect,
+    citySearch,
+    branchSearch,
+    deliveryTypeInputs,
+    deliveryBranchWrap,
+    deliveryBranchTitle,
+    deliveryAddressWrap
+  } = refs;
   if(!citySelect || !branchSelect) return;
-  const apiKey = getNovaPoshtaApiKey();
+  const useApi = Boolean(getNovaPoshtaProxyUrl() || getNovaPoshtaApiKey());
+  const deliveryInputs = Array.isArray(deliveryTypeInputs)
+    ? deliveryTypeInputs
+    : (deliveryTypeInputs ? Array.from(deliveryTypeInputs) : []);
+  const getDeliveryType = () => getDeliveryTypeFromInputs(deliveryInputs);
   const blockEnter = input => {
     if(!input) return;
     input.addEventListener('keydown', evt => {
@@ -469,6 +623,38 @@ function setupNovaPoshtaSelects(refs){
   };
   blockEnter(citySearch);
   blockEnter(branchSearch);
+  setDeliveryTypeActive(deliveryInputs);
+
+  const updateDeliveryUI = (opts = {}) => {
+    const deliveryType = getDeliveryType();
+    const isCourier = deliveryType === 'courier';
+    setDeliveryTypeActive(deliveryInputs);
+    if(deliveryBranchWrap) deliveryBranchWrap.classList.toggle('delivery-hidden', isCourier);
+    if(deliveryAddressWrap) deliveryAddressWrap.classList.toggle('delivery-hidden', !isCourier);
+    if(branchSelect) branchSelect.required = !isCourier;
+    if(branchSelect) branchSelect.disabled = isCourier;
+    if(branchSearch){
+      branchSearch.disabled = isCourier;
+      branchSearch.placeholder = deliveryType === 'postomat' ? 'Пошук поштомату' : 'Пошук відділення';
+      if(isCourier || opts.resetBranchSearch) branchSearch.value = '';
+    }
+    if(deliveryBranchTitle){
+      deliveryBranchTitle.textContent = deliveryType === 'postomat' ? 'Поштомат НП' : 'Відділення НП';
+    }
+    if(deliveryAddressWrap){
+      $$('input', deliveryAddressWrap).forEach(input => {
+        const required = isCourier && input.name !== 'courierApartment';
+        input.required = required;
+      });
+    }
+    if(opts.skipBranchRender) return;
+    if(isCourier){
+      renderBranchOptions(branchSelect, [], getBranchEmptyLabel(deliveryType));
+      return;
+    }
+    if(useApi) renderApiBranches();
+    else renderStaticBranches();
+  };
 
   const renderStaticCities = term => {
     const search = (term || '').trim().toLowerCase();
@@ -478,14 +664,19 @@ function setupNovaPoshtaSelects(refs){
 
   const renderStaticBranches = () => {
     const search = (branchSearch?.value || '').trim().toLowerCase();
+    const deliveryType = getDeliveryType();
+    if(deliveryType === 'courier'){
+      renderBranchOptions(branchSelect, [], getBranchEmptyLabel(deliveryType));
+      return;
+    }
     const selected = citySelect.options[citySelect.selectedIndex];
     if(!citySelect.value || selected?.disabled){
-      renderBranchOptions(branchSelect, []);
+      renderBranchOptions(branchSelect, [], getBranchEmptyLabel(deliveryType));
       return;
     }
     const loc = NOVA_POSHTA_LOCATIONS.find(l => l.city === citySelect.value) || NOVA_POSHTA_LOCATIONS[0];
     const branches = (loc?.branches || []).filter(branch => !search || branch.toLowerCase().includes(search));
-    renderBranchOptions(branchSelect, branches);
+    renderBranchOptions(branchSelect, filterBranchesByDeliveryType(branches, deliveryType), getBranchEmptyLabel(deliveryType));
   };
 
   const renderApiCities = async term => {
@@ -498,21 +689,28 @@ function setupNovaPoshtaSelects(refs){
       renderStaticCities(term);
       renderStaticBranches();
     }
+    updateDeliveryUI({skipBranchRender:true});
   };
 
   const renderApiBranches = async () => {
+    const deliveryType = getDeliveryType();
+    if(deliveryType === 'courier'){
+      renderBranchOptions(branchSelect, [], getBranchEmptyLabel(deliveryType));
+      return;
+    }
     const option = citySelect.options[citySelect.selectedIndex];
     const cityRef = option ? option.dataset.ref : '';
     const cityName = citySelect.value;
     const term = (branchSearch?.value || '').trim();
     if(!cityName || option?.disabled){
-      renderBranchOptions(branchSelect, []);
+      renderBranchOptions(branchSelect, [], getBranchEmptyLabel(deliveryType));
       return;
     }
     try{
       const data = await fetchNovaPoshtaWarehouses(cityRef, cityName, term);
-      const branches = data.map(item => item.Description).filter(Boolean);
-      renderBranchOptions(branchSelect, branches);
+      const filtered = filterWarehouseItemsByDeliveryType(data, deliveryType);
+      const branches = filtered.map(item => item.Description).filter(Boolean);
+      renderBranchOptions(branchSelect, branches, getBranchEmptyLabel(deliveryType));
     }catch(err){
       console.warn('Nova Poshta branches failed', err);
       renderStaticBranches();
@@ -521,35 +719,43 @@ function setupNovaPoshtaSelects(refs){
 
   const onCityChange = () => {
     if(branchSearch) branchSearch.value = '';
-    if(apiKey) renderApiBranches();
-    else renderStaticBranches();
+    updateDeliveryUI();
   };
 
   if(citySearch){
     const handler = debounce(() => {
       const term = citySearch.value;
       if(branchSearch) branchSearch.value = '';
-      if(apiKey) renderApiCities(term);
+      if(useApi) renderApiCities(term);
       else{
         renderStaticCities(term);
         renderStaticBranches();
+        updateDeliveryUI({skipBranchRender:true});
       }
     });
     citySearch.addEventListener('input', handler);
   }
   if(branchSearch){
     const handler = debounce(() => {
-      if(apiKey) renderApiBranches();
+      if(getDeliveryType() === 'courier') return;
+      if(useApi) renderApiBranches();
       else renderStaticBranches();
     });
     branchSearch.addEventListener('input', handler);
   }
   citySelect.addEventListener('change', onCityChange);
 
-  if(apiKey) renderApiCities(citySearch?.value || '');
+  if(deliveryInputs.length){
+    deliveryInputs.forEach(input => input.addEventListener('change', () => {
+      updateDeliveryUI({resetBranchSearch:true});
+    }));
+  }
+
+  if(useApi) renderApiCities(citySearch?.value || '');
   else{
     renderStaticCities(citySearch?.value || '');
     renderStaticBranches();
+    updateDeliveryUI({skipBranchRender:true});
   }
 }
 
@@ -1540,6 +1746,10 @@ function bootOrderDrawer(){
     form,
     sizeSelect,
     packSelect:$('#drawerPackSize'),
+    deliveryTypeInputs:$$('input[name="deliveryType"]', form),
+    deliveryBranchWrap:$('[data-delivery-branch]', form),
+    deliveryBranchTitle:$('.delivery-branch-title', form),
+    deliveryAddressWrap:$('[data-delivery-address]', form),
     citySelect:$('#npCity'),
     citySearch:$('#npCitySearch'),
     branchSelect:$('#npBranch'),
@@ -1611,7 +1821,38 @@ function bootOrderDrawer(){
     const pricePerPack = getPackPrice(product, packSize);
     const totalPrice = pricePerPack * packs;
     const payment = fd.get('payment') === 'full' ? 'Повна оплата' : 'Післяплата';
-    const summary = `ЗАМОВЛЕННЯ MI_STORE\nМодель: ${product.name}\nРозмір: ${ORDER_DRAWER_STATE.size || 'не вказано'}\nКомплектів: ${packs} (по ${packSize} шт)\nВсього штук: ${totalPieces}\nСума: ${formatCurrency(totalPrice)} без доставки\n—\nІм’я: ${fd.get('firstName')} ${fd.get('lastName')}\nТелефон: ${fd.get('phone')}\nМісто: ${fd.get('npCity')}\nВідділення: ${fd.get('npBranch')}\nОплата: ${payment}\nКоментар: ${fd.get('comment') || ''}`;
+    const deliveryType = getDeliveryTypeFromInputs(ORDER_DRAWER_REFS?.deliveryTypeInputs || []);
+    const deliveryLabel = getDeliveryTypeLabel(deliveryType);
+    const firstName = String(fd.get('firstName') || '').trim();
+    const lastName = String(fd.get('lastName') || '').trim();
+    const phone = String(fd.get('phone') || '').trim();
+    const city = String(fd.get('npCity') || '').trim();
+    const branch = String(fd.get('npBranch') || '').trim();
+    const courierAddress = buildCourierAddress(form);
+    if(!phone){
+      alert('Вкажіть телефон.');
+      return;
+    }
+    if(!city){
+      alert('Оберіть місто Нової пошти.');
+      return;
+    }
+    let deliveryValue = '';
+    if(deliveryType === 'courier'){
+      if(!courierAddress){
+        alert('Вкажіть адресу курʼєра.');
+        return;
+      }
+      deliveryValue = courierAddress;
+    }else{
+      if(!branch){
+        alert('Оберіть відділення або поштомат.');
+        return;
+      }
+      deliveryValue = branch;
+    }
+    const deliverySummary = `${deliveryLabel}: ${deliveryValue}`;
+    const summary = `ЗАМОВЛЕННЯ MI_STORE\nМодель: ${product.name}\nРозмір: ${ORDER_DRAWER_STATE.size || 'не вказано'}\nКомплектів: ${packs} (по ${packSize} шт)\nВсього штук: ${totalPieces}\nСума: ${formatCurrency(totalPrice)} без доставки\n—\nІм’я: ${firstName} ${lastName}\nТелефон: ${phone}\nМісто: ${city}\nДоставка: ${deliverySummary}\nОплата: ${payment}\nКоментар: ${fd.get('comment') || ''}`;
     const payload = {
       source:'quick-order',
       createdAt:new Date().toISOString(),
@@ -1625,11 +1866,11 @@ function bootOrderDrawer(){
       totalPieces:String(totalPieces),
       pricePerPack:String(pricePerPack),
       totalPrice:String(totalPrice),
-      firstName:String(fd.get('firstName') || ''),
-      lastName:String(fd.get('lastName') || ''),
-      phone:String(fd.get('phone') || ''),
-      npCity:String(fd.get('npCity') || ''),
-      npBranch:String(fd.get('npBranch') || ''),
+      firstName,
+      lastName,
+      phone,
+      npCity:city,
+      npBranch:deliverySummary,
       payment,
       comment:String(fd.get('comment') || ''),
       page:location.href
@@ -1708,6 +1949,7 @@ function syncCheckoutSummary(){
 function bootCheckoutPage(){
   const root = document.querySelector('[data-checkout]');
   if(!root) return;
+  const form = document.querySelector('#checkoutForm');
   CHECKOUT_REFS = {
     img:document.querySelector('[data-co-img]'),
     nameEl:document.querySelector('[data-co-name]'),
@@ -1720,11 +1962,15 @@ function bootCheckoutPage(){
     piecesEl:document.querySelector('[data-co-pieces]'),
     pricePackEl:document.querySelector('[data-co-price]'),
     totalEl:document.querySelector('[data-co-total]'),
-    citySelect:document.querySelector('#city'),
+    deliveryTypeInputs:form ? $$('input[name="deliveryType"]', form) : [],
+    deliveryBranchWrap:form ? $('[data-delivery-branch]', form) : null,
+    deliveryBranchTitle:form ? $('.delivery-branch-title', form) : null,
+    deliveryAddressWrap:form ? $('[data-delivery-address]', form) : null,
+    citySelect:document.querySelector('#coCity'),
     citySearch:document.querySelector('#coCitySearch'),
-    branchSelect:document.querySelector('#warehouse'),
+    branchSelect:document.querySelector('#coBranch'),
     branchSearch:document.querySelector('#coBranchSearch'),
-    form:document.querySelector('#checkoutForm'),
+    form,
     paymentNote:document.querySelector('#coPaymentNote')
   };
   preventFormEnterSubmit(CHECKOUT_REFS.form);
@@ -1774,19 +2020,37 @@ function bootCheckoutPage(){
       const pricePerPack = getPackPrice(product, packSize);
       const totalPrice = pricePerPack * packs;
       const payment = fd.get('payment') === 'full' ? 'Повна оплата' : 'Післяплата';
+      const deliveryType = getDeliveryTypeFromInputs(CHECKOUT_REFS?.deliveryTypeInputs || []);
+      const deliveryLabel = getDeliveryTypeLabel(deliveryType);
       const firstName = String(fd.get('firstName') || '').trim();
       const lastName = String(fd.get('lastName') || '').trim();
       const phone = String(fd.get('phone') || '').trim();
       const city = String(fd.get('npCity') || '').trim();
-      const warehouse = String(fd.get('npBranch') || '').trim();
+      const branch = String(fd.get('npBranch') || '').trim();
       const comment = String(fd.get('comment') || '').trim();
+      const courierAddress = buildCourierAddress(CHECKOUT_REFS.form);
 
-      if(!phone || !city || !warehouse){
-        alert('Будь ласка, заповніть телефон, місто та відділення Нової пошти.');
+      if(!phone || !city){
+        alert('Будь ласка, заповніть телефон та місто Нової пошти.');
         return;
       }
+      let deliveryValue = '';
+      if(deliveryType === 'courier'){
+        if(!courierAddress){
+          alert('Будь ласка, вкажіть адресу курʼєра.');
+          return;
+        }
+        deliveryValue = courierAddress;
+      }else{
+        if(!branch){
+          alert('Будь ласка, оберіть відділення або поштомат.');
+          return;
+        }
+        deliveryValue = branch;
+      }
+      const deliverySummary = `${deliveryLabel}: ${deliveryValue}`;
 
-      const summary = `ЗАМОВЛЕННЯ MI_STORE\nМодель: ${product.name}\nРозмір: ${CHECKOUT_STATE.size}\nКомплектів: ${packs} (по ${packSize} шт)\nВсього штук: ${totalPieces}\nСума: ${formatCurrency(totalPrice)} без доставки\n—\nІм’я: ${firstName} ${lastName}\nТелефон: ${phone}\nМісто: ${city}\nВідділення: ${warehouse}\nОплата: ${payment}\nКоментар: ${comment}`;
+      const summary = `ЗАМОВЛЕННЯ MI_STORE\nМодель: ${product.name}\nРозмір: ${CHECKOUT_STATE.size}\nКомплектів: ${packs} (по ${packSize} шт)\nВсього штук: ${totalPieces}\nСума: ${formatCurrency(totalPrice)} без доставки\n—\nІм’я: ${firstName} ${lastName}\nТелефон: ${phone}\nМісто: ${city}\nДоставка: ${deliverySummary}\nОплата: ${payment}\nКоментар: ${comment}`;
       const payload = {
         source:'checkout-page',
         createdAt:new Date().toISOString(),
@@ -1804,7 +2068,7 @@ function bootCheckoutPage(){
         lastName,
         phone,
         npCity:city,
-        npBranch:warehouse,
+        npBranch:deliverySummary,
         payment,
         comment,
         page:location.href

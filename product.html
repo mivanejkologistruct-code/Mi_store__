@@ -81,10 +81,27 @@
         <select required id="npCity" name="npCity"></select>
         <div class="branch-search"><input type="search" id="npCitySearch" placeholder="Пошук міста"></div>
       </label>
-      <label>Відділення / поштомат НП
+      <div class="delivery-group" data-delivery-type>
+        <p class="delivery-label">Спосіб доставки</p>
+        <div class="delivery-options">
+          <label class="delivery-option"><input type="radio" name="deliveryType" value="branch" checked> Відділення</label>
+          <label class="delivery-option"><input type="radio" name="deliveryType" value="postomat"> Поштомат</label>
+          <label class="delivery-option"><input type="radio" name="deliveryType" value="courier"> Курʼєр</label>
+        </div>
+      </div>
+      <label data-delivery-branch>
+        <span class="delivery-branch-title">Відділення / поштомат НП</span>
         <select required id="npBranch" name="npBranch"></select>
         <div class="branch-search"><input type="search" id="npBranchSearch" placeholder="Пошук відділення або поштомату"></div>
       </label>
+      <div class="delivery-address delivery-hidden" data-delivery-address>
+        <p class="delivery-label">Адреса курʼєра</p>
+        <div class="delivery-address-grid">
+          <input name="courierStreet" placeholder="Вулиця" autocomplete="street-address">
+          <input name="courierHouse" placeholder="Будинок" autocomplete="address-line1">
+          <input name="courierApartment" placeholder="Квартира" autocomplete="address-line2">
+        </div>
+      </div>
       <label>Спосіб оплати
         <select name="payment" required>
           <option value="cod">Післяплата</option>
