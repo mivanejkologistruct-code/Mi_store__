@@ -10,13 +10,15 @@ const PACK_DEFAULT = 4;
 const MUST_HAVE_IDS = ['v2','v3','v9'];
 const PACK_OPTIONS_STANDARD = [2,4];
 const PACK_OPTIONS_FIVE = [5];
+const PACK_OPTIONS_SINGLE = [1];
 const COMPOSITION_VERICOH = 'Склад: 70% бавовна, 22% бамбукове волокно, 8% спандекс 🧵';
 const COMPOSITION_V2 = 'Склад: 88% поліамід, 12% еластан · перфорація для вентиляції';
 const COMPOSITION_V395 = 'Склад: 95% бавовна, 5% еластан — максимально м’які';
 const COMPOSITION_THERMO = 'Склад: 62% бавовна, 30% поліестер, 8% еластан — утеплений шар для холоду';
 const VERICOH_DETAIL = 'Vericoh шиє базу та преміум лінійки на фабриці в Гуандуні. Плоскі шви, м’який пояс, еластан до 12% — тканина не перекручується, зберігає форму після прання і не тисне в русі.';
-const CHECKOUT_WEBHOOK_URL = 'https://script.google.com/macros/s/AKfycbwAxBt37K-rcJOz7TjAg9dZB5xBYrl-uwOuhERKjAO_adsnqedFfYR0c8oDiPObRU6D/exec';
-const CHECKOUT_WEBHOOK_TOKEN = 'SECRET_TOKEN';
+const SHEETS_WEB_APP_URL = '';
+const SHEETS_WEB_APP_STORAGE_KEY = 'mi_sheets_web_app_url';
+const SHEETS_WEB_APP_TIMEOUT = 8000;
 const numberFormatter = new Intl.NumberFormat('uk-UA');
 const formatCurrency = value => `${numberFormatter.format(Math.round(value || 0))} грн`;
 const formatNumber = value => numberFormatter.format(Math.round(value || 0));
@@ -29,7 +31,7 @@ const XL_SIZES = ['XL','2XL','3XL','4XL'];
 const SPORT_SIZES = ['M','L','XL','2XL','3XL'];
 const THERMO_SIZES = ['S','M','L','XL','2XL','3XL'];
 const THERMO_PRICE = 890;
-const THERMO_OLD_PRICE = 990;
+const THERMO_OLD_PRICE = 950;
 
 /* ===== Products ===== */
 const BASE_PRODUCTS = [
@@ -37,7 +39,7 @@ const BASE_PRODUCTS = [
   {id:'v2',brand:'MI_STORE',name:'Airflow Ice',packSize:5,packOptions:PACK_OPTIONS_FIVE,price:990,oldPrice:1090,images:['images/products/v2a.jpg','images/products/v2b.jpg'],tags:['vericoh','perforated'],sizes:[...XL_SIZES],availability:makeAvailability(XL_SIZES),badge:'Must have',material:COMPOSITION_V2,description:'Перфорована тканина з охолодженням для тренувань та літа.'},
   {id:'v3',brand:'MI_STORE',name:'Classic Navy',packSize:5,packOptions:PACK_OPTIONS_FIVE,price:990,oldPrice:1090,images:['images/products/v3a.jpg','images/products/v3b.jpg'],tags:['vericoh','classic'],sizes:[...XL_SIZES],availability:makeAvailability(XL_SIZES),material:COMPOSITION_V395,description:'Темний класичний сет з 95% бавовни і пружним поясом.'},
   {id:'v4',brand:'MI_STORE',name:'Vericoh Check Premium',packSize:4,packOptions:PACK_OPTIONS_STANDARD,price:850,oldPrice:890,images:['images/products/v4a.jpg','images/products/v4b.jpg'],tags:['vericoh','premium'],sizes:[...XL_SIZES],availability:makeAvailability(XL_SIZES),badge:'Premium',material:COMPOSITION_VERICOH,description:'Преміальна клітинка на поясі та м’яка мікрофібра, що тримає форму.'},
-  {id:'v5',brand:'MI_STORE',name:'Vericoh Thermo Base',packSize:4,packOptions:PACK_OPTIONS_STANDARD,price:THERMO_PRICE,oldPrice:THERMO_OLD_PRICE,images:['images/products/v5a.jpg','images/products/v5b.jpg'],tags:['thermal'],trend:true,sizes:[...THERMO_SIZES],availability:makeAvailability(THERMO_SIZES),badge:'Thermo',material:COMPOSITION_VERICOH,description:'Термосет з вологовідведенням для міжсезоння та ранкових забігів.'},
+  {id:'v5',brand:'MI_STORE',name:'Vericoh Thermo Base',packSize:1,packOptions:PACK_OPTIONS_SINGLE,price:THERMO_PRICE,oldPrice:THERMO_OLD_PRICE,images:['images/products/v5a.jpg','images/products/v5b.jpg'],tags:['thermal'],trend:true,sizes:[...THERMO_SIZES],availability:makeAvailability(THERMO_SIZES),badge:'Thermo',material:COMPOSITION_VERICOH,description:'Термосет з вологовідведенням для міжсезоння та ранкових забігів.'},
   {id:'v6',brand:'MI_STORE',name:'Uomo Sport Flex',packSize:4,packOptions:PACK_OPTIONS_STANDARD,price:850,oldPrice:890,images:['images/products/v6a.jpg','images/products/v6b.jpg'],tags:['vericoh','sport'],sizes:[...SPORT_SIZES],availability:makeAvailability(SPORT_SIZES),badge:'Sport',material:COMPOSITION_VERICOH,description:'Компресійний сет Uomo з розмірами від M до 3XL, міцна посадка.'},
   {id:'v7',brand:'MI_STORE',name:'Vericoh Urban Ink',packSize:4,packOptions:PACK_OPTIONS_STANDARD,price:850,oldPrice:890,images:['images/products/v7a.jpg','images/products/v7b.jpg'],tags:['vericoh','dark'],sizes:[...XL_SIZES],availability:makeAvailability(XL_SIZES),material:COMPOSITION_VERICOH,description:'Темний урбан-сет із м’якою мікрофіброю та мінімумом швів.'},
   {id:'v8',brand:'MI_STORE',name:'Vericoh Ice Cotton',packSize:4,packOptions:PACK_OPTIONS_STANDARD,price:850,oldPrice:890,images:['images/products/v8a.jpg','images/products/v8b.jpg'],tags:['vericoh','light'],sizes:[...XL_SIZES],availability:makeAvailability(XL_SIZES),material:COMPOSITION_V395,description:'Світлий сет з охолоджувальним ефектом і 95% бавовни.'},
@@ -45,8 +47,8 @@ const BASE_PRODUCTS = [
   {id:'v10',brand:'MI_STORE',name:'Vericoh Shadow Steel',packSize:4,packOptions:PACK_OPTIONS_STANDARD,price:850,oldPrice:890,images:['images/products/v10a.jpg','images/products/v10b.jpg'],tags:['vericoh','basic'],sizes:[...XL_SIZES],availability:makeAvailability(XL_SIZES),material:COMPOSITION_VERICOH,description:'Сіра технічна база — поєднуй з денімом та худі.'},
   {id:'v11',brand:'MI_STORE',name:'Vericoh Storm Stone',packSize:4,packOptions:PACK_OPTIONS_STANDARD,price:850,oldPrice:890,images:['images/products/v11a.jpg','images/products/v11b.jpg'],tags:['vericoh','classic'],sizes:[...XL_SIZES],availability:makeAvailability(XL_SIZES),material:COMPOSITION_VERICOH,description:'Стриманий сірий сет зі щільним поясом та класичною посадкою.'},
   {id:'v12',brand:'MI_STORE',name:'Vericoh Fresh Sage',packSize:4,packOptions:PACK_OPTIONS_STANDARD,price:850,oldPrice:890,images:['images/products/v12a.jpg','images/products/v12b.jpg'],tags:['vericoh','light'],sizes:[...XL_SIZES],availability:makeAvailability(XL_SIZES),badge:'New',material:COMPOSITION_VERICOH,description:'Свіжий світлий відтінок з легким горошком та комфортом на дотик.'},
-  {id:'v101',brand:'MI_STORE',name:'Thermo Shield Black',packSize:4,packOptions:PACK_OPTIONS_STANDARD,price:THERMO_PRICE,oldPrice:THERMO_OLD_PRICE,images:['images/products/v101a.jpg','images/products/v101b.jpg'],tags:['thermal'],sizes:[...THERMO_SIZES],availability:makeAvailability(THERMO_SIZES),badge:'Thermo',material:COMPOSITION_THERMO,description:'Утеплений термосет для холоду: м’який всередині, еластичний зовні.'},
-  {id:'v102',brand:'MI_STORE',name:'Thermo Shield Graphite',packSize:4,packOptions:PACK_OPTIONS_STANDARD,price:THERMO_PRICE,oldPrice:THERMO_OLD_PRICE,images:['images/products/v102a.jpg','images/products/v102b.jpg'],tags:['thermal'],sizes:[...THERMO_SIZES],availability:makeAvailability(THERMO_SIZES),badge:'Thermo',material:COMPOSITION_THERMO,description:'Щільна термобілизна для міста та спорту: тримає тепло без зайвого об’єму.'}
+  {id:'v101',brand:'MI_STORE',name:'Thermo Shield Black',packSize:1,packOptions:PACK_OPTIONS_SINGLE,price:THERMO_PRICE,oldPrice:THERMO_OLD_PRICE,images:['images/products/v101a.jpg','images/products/v101b.jpg'],tags:['thermal'],sizes:[...THERMO_SIZES],availability:makeAvailability(THERMO_SIZES),badge:'Thermo',material:COMPOSITION_THERMO,description:'Утеплений термосет для холоду: м’який всередині, еластичний зовні.'},
+  {id:'v102',brand:'MI_STORE',name:'Thermo Shield Graphite',packSize:1,packOptions:PACK_OPTIONS_SINGLE,price:THERMO_PRICE,oldPrice:THERMO_OLD_PRICE,images:['images/products/v102a.jpg','images/products/v102b.jpg'],tags:['thermal'],sizes:[...THERMO_SIZES],availability:makeAvailability(THERMO_SIZES),badge:'Thermo',material:COMPOSITION_THERMO,description:'Щільна термобілизна для міста та спорту: тримає тепло без зайвого об’єму.'}
 ];
 
 /* ===== Reviews ===== */
@@ -209,12 +211,18 @@ const getPackPrice = (product, packSize) => {
   const perPiece = basePrice / baseSize;
   return Math.round(perPiece * (packSize || baseSize));
 };
+const formatPackLabel = packSize => (packSize === 1 ? '1 комплект' : `${packSize} шт`);
+const formatPackOption = (product, packSize) => `${formatPackLabel(packSize)} · ${formatCurrency(getPackPrice(product, packSize))}`;
 const pluralPacks = count => {
   const mod10 = count % 10;
   const mod100 = count % 100;
   if(mod10 === 1 && mod100 !== 11) return 'комплект';
   if(mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return 'комплекти';
   return 'комплектів';
+};
+const formatPackCount = (packs, packSize) => {
+  const base = `${packs} ${pluralPacks(packs)}`;
+  return packSize === 1 ? base : `${base} по ${packSize} шт`;
 };
 
 function filterHomeProducts(){
@@ -267,6 +275,55 @@ const debounce = (fn, delay=260) => {
     t = setTimeout(() => fn(...args), delay);
   };
 };
+
+function getSheetsWebAppUrl(){
+  if(typeof window !== 'undefined' && window.GSHEETS_WEB_APP_URL){
+    return String(window.GSHEETS_WEB_APP_URL).trim();
+  }
+  try{
+    const stored = localStorage.getItem(SHEETS_WEB_APP_STORAGE_KEY);
+    if(stored) return stored.trim();
+  }catch(_){
+    /* ignore */
+  }
+  return SHEETS_WEB_APP_URL;
+}
+
+async function postToSheets(payload){
+  const url = getSheetsWebAppUrl();
+  if(!url) return {status:'missing'};
+  const body = new URLSearchParams(payload).toString();
+  const controller = typeof AbortController === 'function' ? new AbortController() : null;
+  let timeoutId = null;
+  if(controller){
+    timeoutId = setTimeout(() => controller.abort(), SHEETS_WEB_APP_TIMEOUT);
+  }
+  try{
+    const res = await fetch(url, {
+      method:'POST',
+      headers:{'Content-Type':'application/x-www-form-urlencoded;charset=UTF-8'},
+      body,
+      signal: controller ? controller.signal : undefined
+    });
+    if(timeoutId) clearTimeout(timeoutId);
+    if(res.ok) return {status:'ok'};
+    const text = await res.text();
+    return {status:'error', error:new Error(text || 'Sheets request failed')};
+  }catch(err){
+    if(timeoutId) clearTimeout(timeoutId);
+    try{
+      await fetch(url, {
+        method:'POST',
+        mode:'no-cors',
+        headers:{'Content-Type':'application/x-www-form-urlencoded;charset=UTF-8'},
+        body
+      });
+      return {status:'ok'};
+    }catch(_){
+      return {status:'error', error:err};
+    }
+  }
+}
 
 function getNovaPoshtaApiKey(){
   if(typeof window !== 'undefined' && window.NOVA_POSHTA_API_KEY){
@@ -486,8 +543,26 @@ function resolveTimerDeadline(el){
   const dataset = el.dataset || {};
   const attr = dataset.deadline;
   if(attr){
+    const token = String(attr).trim().toLowerCase();
+    if(token === 'end-of-january' || token === 'end-of-jan'){
+      const now = new Date();
+      let year = now.getFullYear();
+      let end = new Date(year, 0, 31, 23, 59, 59, 999);
+      if(end <= now){
+        year += 1;
+        end = new Date(year, 0, 31, 23, 59, 59, 999);
+      }
+      return end;
+    }
     const parsed = new Date(attr);
-    if(!Number.isNaN(parsed.getTime())) return parsed;
+    if(!Number.isNaN(parsed.getTime())){
+      if(parsed <= new Date()){
+        const bump = new Date(parsed);
+        bump.setFullYear(parsed.getFullYear() + 1);
+        return bump;
+      }
+      return parsed;
+    }
   }
   const hoursRaw = dataset.hours || '0';
   const hours = parseFloat(hoursRaw);
@@ -605,15 +680,15 @@ function bootMustHaveSlider(){
   const slides = [
     {
       image:'images/promo-musthave 1.jpg',
-      desc:'5 шт MUST HAVE: Airflow, Classic і Midnight — три фактури, які тримають форму й не перегрівають.',
-      bullets:['5 шт у комплекті — економія на кожній парі','Airflow — перфорація та охолодження для тренувань','Midnight — преміум мікрофібра з темним поясом'],
-      note:'5 шт = 990 грн · швидка відправка Новою поштою'
+      desc:'MUST HAVE комплекти: Airflow, Classic і Midnight — три фактури, які тримають форму й не перегрівають.',
+      bullets:['Комплект 5 шт — економія на кожній парі','Airflow — перфорація та охолодження для тренувань','Midnight — преміум мікрофібра з темним поясом'],
+      note:'4 шт = 850 грн · 5 шт = 990 грн'
     },
     {
       image:'images/promo-musthave 2.jpg',
-      desc:'4 шт MUST HAVE: темні сети з блиском пояса — щільна посадка, акуратний вигляд, мінімум швів.',
-      bullets:['4 шт у комплекті — оптимальний старт','Classic — 95% бавовна та м’які шви','Blackout mix — темний мікс без зайвого брендингу'],
-      note:'4 шт = 850 грн · допомагаємо підібрати розмір у Direct'
+      desc:'MUST HAVE комплекти: темні сети з блиском пояса — щільна посадка, акуратний вигляд, мінімум швів.',
+      bullets:['Комплект 4 шт — оптимальний старт','Classic — 95% бавовна та м’які шви','Blackout mix — темний мікс без зайвого брендингу'],
+      note:'4 шт = 850 грн · 5 шт = 990 грн'
     }
   ];
   if(!slides.length || !img) return;
@@ -826,7 +901,7 @@ function createProductCard(product){
 
   const packInfo = document.createElement('div');
   packInfo.className = 'pack-info';
-  packInfo.textContent = `${formatCurrency(currentPrice)} · ${defaultPack} шт` + (packOptions.length > 1 ? ' (+ інші опції)' : '');
+  packInfo.textContent = `${formatCurrency(currentPrice)} · ${formatPackLabel(defaultPack)}` + (packOptions.length > 1 ? ' (+ інші опції)' : '');
   card.appendChild(packInfo);
 
   const metaText = product.material || product.description;
@@ -980,7 +1055,7 @@ function createProductDetail(product){
   packOptions.forEach(opt => {
     const option = document.createElement('option');
     option.value = opt;
-    option.textContent = `${opt} шт`;
+    option.textContent = formatPackOption(product, opt);
     packSelect.appendChild(option);
   });
 
@@ -1062,9 +1137,11 @@ function createProductDetail(product){
   const updateSummary = () => {
     const perPack = getPackPrice(product, state.packSize);
     priceMain.textContent = formatCurrency(perPack);
-    qtyStrong.textContent = `${state.packs} ${pluralPacks(state.packs)}`;
+    qtyStrong.textContent = formatPackCount(state.packs, state.packSize);
     qtySmall.textContent = `${state.packs * state.packSize} шт`;
-    qtyNote.textContent = `Комплект по ${state.packSize} шт. Замовлення кратне комплекту.`;
+    qtyNote.textContent = state.packSize === 1
+      ? 'Комплект = 1 шт. Замовлення кратне комплекту.'
+      : `Комплект по ${state.packSize} шт. Замовлення кратне комплекту.`;
     summary.innerHTML = `<strong>${formatCurrency(perPack * state.packs)}</strong><span>Разом (без доставки)</span>`;
   };
   updateSummary();
@@ -1365,7 +1442,7 @@ function syncOrderDrawer(){
     packOptions.forEach(opt => {
       const option = document.createElement('option');
       option.value = opt;
-      option.textContent = `${opt} шт`;
+      option.textContent = formatPackOption(product, opt);
       ORDER_DRAWER_REFS.packSelect.appendChild(option);
     });
     ORDER_DRAWER_REFS.packSelect.value = packSize;
@@ -1373,14 +1450,16 @@ function syncOrderDrawer(){
   }
   if(ORDER_DRAWER_REFS.img) setSmartSrc(ORDER_DRAWER_REFS.img, (product.images || [])[0]);
   if(ORDER_DRAWER_REFS.nameEl) ORDER_DRAWER_REFS.nameEl.textContent = product.name;
-  if(ORDER_DRAWER_REFS.metaEl) ORDER_DRAWER_REFS.metaEl.textContent = `Комплект: ${packSize} шт • Розмір: ${ORDER_DRAWER_STATE.size || 'оберіть розмір'}`;
+  if(ORDER_DRAWER_REFS.metaEl) ORDER_DRAWER_REFS.metaEl.textContent = `Комплект: ${formatPackLabel(packSize)} (${formatCurrency(getPackPrice(product, packSize))}) • Розмір: ${ORDER_DRAWER_STATE.size || 'оберіть розмір'}`;
   const perPackPrice = getPackPrice(product, packSize);
   if(ORDER_DRAWER_REFS.pricePackEl) ORDER_DRAWER_REFS.pricePackEl.textContent = formatCurrency(perPackPrice);
   if(ORDER_DRAWER_REFS.totalEl) ORDER_DRAWER_REFS.totalEl.textContent = formatCurrency(perPackPrice * ORDER_DRAWER_STATE.packs);
-  if(ORDER_DRAWER_REFS.packCountEl) ORDER_DRAWER_REFS.packCountEl.textContent = `${ORDER_DRAWER_STATE.packs} ${pluralPacks(ORDER_DRAWER_STATE.packs)}`;
+  if(ORDER_DRAWER_REFS.packCountEl) ORDER_DRAWER_REFS.packCountEl.textContent = formatPackCount(ORDER_DRAWER_STATE.packs, packSize);
   if(ORDER_DRAWER_REFS.piecesEl){
     const totalPieces = packSize * ORDER_DRAWER_STATE.packs;
-    ORDER_DRAWER_REFS.piecesEl.textContent = `${totalPieces} шт (по ${packSize})`;
+    ORDER_DRAWER_REFS.piecesEl.textContent = packSize === 1
+      ? `${totalPieces} шт`
+      : `${totalPieces} шт (по ${packSize})`;
   }
   if(ORDER_DRAWER_REFS.checkoutSummary){
     const totalPieces = packSize * ORDER_DRAWER_STATE.packs;
@@ -1470,7 +1549,7 @@ function bootOrderDrawer(){
       closeOrderDrawer();
     }
   });
-  form.addEventListener('submit', evt => {
+  form.addEventListener('submit', async evt => {
     evt.preventDefault();
     if(!ORDER_DRAWER_STATE.product) return;
     const fd = new FormData(form);
@@ -1478,11 +1557,47 @@ function bootOrderDrawer(){
     const packSize = normalizePackSize(product, ORDER_DRAWER_STATE.packSize);
     const packs = ORDER_DRAWER_STATE.packs;
     const totalPieces = packSize * packs;
-    const totalPrice = getPackPrice(product, packSize) * packs;
+    const pricePerPack = getPackPrice(product, packSize);
+    const totalPrice = pricePerPack * packs;
     const payment = fd.get('payment') === 'full' ? 'Повна оплата' : 'Післяплата';
     const summary = `ЗАМОВЛЕННЯ MI_STORE\nМодель: ${product.name}\nРозмір: ${ORDER_DRAWER_STATE.size || 'не вказано'}\nКомплектів: ${packs} (по ${packSize} шт)\nВсього штук: ${totalPieces}\nСума: ${formatCurrency(totalPrice)} без доставки\n—\nІм’я: ${fd.get('firstName')} ${fd.get('lastName')}\nТелефон: ${fd.get('phone')}\nМісто: ${fd.get('npCity')}\nВідділення: ${fd.get('npBranch')}\nОплата: ${payment}\nКоментар: ${fd.get('comment') || ''}`;
+    const payload = {
+      source:'quick-order',
+      createdAt:new Date().toISOString(),
+      orderId:String(Date.now()),
+      productId:product.id,
+      productName:product.name,
+      brand:product.brand,
+      size:ORDER_DRAWER_STATE.size || '',
+      packSize:String(packSize),
+      packs:String(packs),
+      totalPieces:String(totalPieces),
+      pricePerPack:String(pricePerPack),
+      totalPrice:String(totalPrice),
+      firstName:String(fd.get('firstName') || ''),
+      lastName:String(fd.get('lastName') || ''),
+      phone:String(fd.get('phone') || ''),
+      npCity:String(fd.get('npCity') || ''),
+      npBranch:String(fd.get('npBranch') || ''),
+      payment,
+      comment:String(fd.get('comment') || ''),
+      page:location.href
+    };
+    const submitBtn = form.querySelector('button[type="submit"]');
+    const submitLabel = submitBtn ? submitBtn.textContent : '';
+    if(submitBtn) submitBtn.disabled = true;
+    if(submitBtn) submitBtn.textContent = 'Відправляємо...';
+    const result = await postToSheets(payload);
+    if(submitBtn) submitBtn.disabled = false;
+    if(submitBtn) submitBtn.textContent = submitLabel;
     copy(summary);
-    alert('Заявку скопійовано у буфер. Встав у Instagram/Telegram.');
+    if(result.status === 'ok'){
+      alert('Заявку відправлено. Дані також скопійовано у буфер.');
+    }else if(result.status === 'missing'){
+      alert('Заявку скопійовано у буфер. Додай URL Apps Script Web App, щоб писати в Google Sheets.');
+    }else{
+      alert('Не вдалося відправити заявку. Дані скопійовано у буфер.');
+    }
     form.reset();
     closeOrderDrawer();
   });
@@ -1508,7 +1623,7 @@ function syncCheckoutSummary(){
   const total = perPack * packs;
   if(CHECKOUT_REFS.img) setSmartSrc(CHECKOUT_REFS.img, (product.images || [])[0]);
   if(CHECKOUT_REFS.nameEl) CHECKOUT_REFS.nameEl.textContent = product.name;
-  if(CHECKOUT_REFS.metaEl) CHECKOUT_REFS.metaEl.textContent = `${product.brand} • ${packSize} шт у комплекті`;
+  if(CHECKOUT_REFS.metaEl) CHECKOUT_REFS.metaEl.textContent = `${product.brand} • ${formatPackLabel(packSize)} (${formatCurrency(perPack)})`;
   if(CHECKOUT_REFS.sizeSelect){
     CHECKOUT_REFS.sizeSelect.innerHTML = '';
     product.sizes.forEach(size => {
@@ -1525,13 +1640,13 @@ function syncCheckoutSummary(){
     packOptions.forEach(opt => {
       const option = document.createElement('option');
       option.value = opt;
-      option.textContent = `${opt} шт`;
+      option.textContent = formatPackOption(product, opt);
       CHECKOUT_REFS.packSelect.appendChild(option);
     });
     CHECKOUT_REFS.packSelect.value = packSize;
     CHECKOUT_REFS.packSelect.disabled = packOptions.length === 1;
   }
-  if(CHECKOUT_REFS.qtyEl) CHECKOUT_REFS.qtyEl.textContent = `${packs} ${pluralPacks(packs)}`;
+  if(CHECKOUT_REFS.qtyEl) CHECKOUT_REFS.qtyEl.textContent = formatPackCount(packs, packSize);
   if(CHECKOUT_REFS.piecesEl) CHECKOUT_REFS.piecesEl.textContent = `${packs * packSize} шт загалом`;
   if(CHECKOUT_REFS.pricePackEl) CHECKOUT_REFS.pricePackEl.textContent = formatCurrency(perPack);
   if(CHECKOUT_REFS.totalEl) CHECKOUT_REFS.totalEl.textContent = formatCurrency(total);
