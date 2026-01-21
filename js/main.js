@@ -29,6 +29,34 @@ const makeAvailability = sizes => cloneSizes(sizes).reduce((acc, size) => {
   acc[size] = true;
   return acc;
 }, {});
+const normalizeSizeValue = value => String(value || '').trim().toUpperCase();
+const getSizeStock = (product, size) => {
+  if(!product || !size || !product.stock) return null;
+  const key = normalizeSizeValue(size);
+  if(!Object.prototype.hasOwnProperty.call(product.stock, key)) return null;
+  const qty = Number(product.stock[key]);
+  return Number.isFinite(qty) ? qty : 0;
+};
+const isSizeAvailable = (product, size) => {
+  if(!product || !size) return false;
+  const qty = getSizeStock(product, size);
+  if(qty === null) return Boolean(product.availability && product.availability[size]);
+  return qty > 0;
+};
+const hasAnyStock = product => {
+  if(!product) return false;
+  const list = product.sizes || [];
+  return list.some(size => isSizeAvailable(product, size));
+};
+const buildSizeOptionLabel = (product, size, showCount) => {
+  const qty = getSizeStock(product, size);
+  if(qty === null){
+    return `${size}${product.availability[size] ? '' : ' (немає)'}`;
+  }
+  if(qty <= 0) return `${size} (немає)`;
+  if(showCount) return `${size} (${qty} шт)`;
+  return size;
+};
 const XL_SIZES = ['XL','2XL','3XL','4XL'];
 const SPORT_SIZES = ['M','L','XL','2XL','3XL'];
 const THERMO_SIZES = ['S','M','L','XL','2XL','3XL'];
@@ -151,6 +179,12 @@ const DELIVERY_TYPE_LABELS = {
   postomat:'Поштомат',
   courier:'Курʼєр'
 };
+const ADMIN_SESSION_KEY = 'mi_admin_until';
+const ADMIN_SESSION_TTL = 24 * 60 * 60 * 1000;
+const STOCK_CACHE_KEY = 'mi_stock_cache_v1';
+const STOCK_CACHE_TTL = 5 * 60 * 1000;
+const STOCK_ACTION = 'stock';
+const STOCK_SIZE_TOKENS = ['4XL','3XL','2XL','XL','L','M','S'];
 
 const ORDER_DRAWER_STATE = {product:null, size:'', packs:1, packSize:PACK_DEFAULT};
 let ORDER_DRAWER_REFS = null;
@@ -185,7 +219,7 @@ let STATE = loadState();
 /* ===== Utils ===== */
 const $ = (sel, root=document) => root.querySelector(sel);
 const $$ = (sel, root=document) => Array.from(root.querySelectorAll(sel));
-const firstAvailableSize = product => product.sizes.find(s => product.availability[s]);
+const firstAvailableSize = product => (product?.sizes || []).find(size => isSizeAvailable(product, size));
 const getProductPrice = product => {
   const value = Number(product?.price);
   return Number.isFinite(value) && value > 0 ? value : CURRENT_PRICE;
@@ -340,6 +374,64 @@ const buildCourierAddress = form => {
   return parts.join(', ');
 };
 
+function setAdminSession(){
+  try{ localStorage.setItem(ADMIN_SESSION_KEY, String(Date.now() + ADMIN_SESSION_TTL)); }
+  catch(_){ /* ignore */ }
+}
+
+function isAdminSession(){
+  try{
+    const until = Number(localStorage.getItem(ADMIN_SESSION_KEY) || 0);
+    return Number.isFinite(until) && until > Date.now();
+  }catch(_){
+    return false;
+  }
+}
+
+function jsonpRequest(url, params, timeoutMs){
+  if(!url) return Promise.reject(new Error('JSONP URL missing'));
+  const callbackName = `jsonp_${Date.now()}_${Math.random().toString(36).slice(2,8)}`;
+  const payload = {...params, callback:callbackName};
+  return new Promise((resolve, reject) => {
+    let done = false;
+    let script = null;
+    const cleanup = () => {
+      if(done) return;
+      done = true;
+      try{ delete window[callbackName]; }catch(_){}
+      if(script && script.parentNode) script.parentNode.removeChild(script);
+      if(timeoutId) clearTimeout(timeoutId);
+    };
+    const timeoutId = setTimeout(() => {
+      cleanup();
+      reject(new Error('JSONP timeout'));
+    }, timeoutMs || 8000);
+    window[callbackName] = data => {
+      cleanup();
+      resolve(data);
+    };
+    const search = new URLSearchParams();
+    Object.entries(payload || {}).forEach(([key, value]) => {
+      if(value === undefined || value === null) return;
+      search.set(key, String(value));
+    });
+    script = document.createElement('script');
+    script.async = true;
+    script.src = `${url}${url.includes('?') ? '&' : '?'}${search.toString()}`;
+    script.onerror = () => {
+      cleanup();
+      reject(new Error('JSONP request failed'));
+    };
+    const target = document.head || document.body;
+    if(!target){
+      cleanup();
+      reject(new Error('JSONP target missing'));
+      return;
+    }
+    target.appendChild(script);
+  });
+}
+
 function preventFormEnterSubmit(form){
   if(!form) return;
   form.addEventListener('keydown', evt => {
@@ -388,19 +480,34 @@ function buildSheetsFields(payload){
     || (packs ? String(packs) : '');
   return {
     token,
+    sku: payload.productId || payload.sku || '',
+    orderId: payload.orderId || '',
+    createdAt: payload.createdAt || '',
+    source: payload.source || 'site',
+    status: payload.status || 'NEW',
+    type: payload.type || payload.orderType || '',
     product: payload.productName || payload.product || '',
+    brand: payload.brand || '',
     size: payload.size || '',
+    packSize: payload.packSize || '',
+    packs: payload.packs || '',
+    totalPieces: payload.totalPieces || '',
     qty,
+    pricePerPack: payload.pricePerPack || '',
+    totalPrice: payload.totalPrice || '',
     price: payload.totalPrice || payload.price || '',
     firstName: payload.firstName || '',
     lastName: payload.lastName || '',
     phone: payload.phone || '',
     city: payload.npCity || payload.city || '',
+    deliveryType: payload.deliveryType || '',
+    deliveryLabel: payload.deliveryLabel || '',
+    deliveryValue: payload.deliveryValue || payload.npBranch || payload.warehouse || '',
     warehouse: payload.npBranch || payload.warehouse || '',
+    courierAddress: payload.courierAddress || '',
     payment: payload.payment || '',
     comment: payload.comment || '',
-    source: payload.source || 'site',
-    status: payload.status || 'NEW'
+    page: payload.page || ''
   };
 }
 
@@ -428,6 +535,200 @@ async function postToSheets(payload){
   }catch(err){
     return {status:'error', error:err};
   }
+}
+
+function loadStockCache(){
+  try{
+    const raw = localStorage.getItem(STOCK_CACHE_KEY);
+    if(!raw) return null;
+    const parsed = JSON.parse(raw);
+    if(!parsed || !parsed.ts || !parsed.data) return null;
+    if(Date.now() - Number(parsed.ts) > STOCK_CACHE_TTL) return null;
+    return parsed.data;
+  }catch(_){
+    return null;
+  }
+}
+
+function saveStockCache(data){
+  try{
+    localStorage.setItem(STOCK_CACHE_KEY, JSON.stringify({ts:Date.now(), data}));
+  }catch(_){
+    /* ignore */
+  }
+}
+
+function parseStockRow(row){
+  if(!row) return null;
+  const skuRaw = row.sku || row.SKU || row.product || row.productId || row.code || '';
+  const sizeRaw = row.size || row.Size || row.rozmir || '';
+  const qtyRaw = row.qty ?? row.Qty ?? row.stock ?? row.Stock ?? row.balance ?? row.qtyPack ?? 0;
+  const parsed = parseSkuParts(String(skuRaw || ''), String(sizeRaw || ''));
+  if(!parsed.productId || !parsed.size) return null;
+  const qty = Number(qtyRaw);
+  return {
+    productId: parsed.productId,
+    size: parsed.size,
+    qty: Number.isFinite(qty) ? qty : 0
+  };
+}
+
+function parseSkuParts(sku, size){
+  const rawSku = String(sku || '').trim();
+  let sizeValue = normalizeSizeValue(size);
+  let productCode = rawSku;
+  if(!sizeValue && rawSku){
+    const upper = rawSku.toUpperCase();
+    const token = STOCK_SIZE_TOKENS.find(sz => upper.endsWith(sz));
+    if(token){
+      sizeValue = token;
+      productCode = upper.slice(0, -token.length).replace(/[-_\s]+$/g,'');
+    }
+  }
+  productCode = String(productCode || '').replace(/[^A-Z0-9]/gi,'');
+  return {productId: productCode.toLowerCase(), size: sizeValue};
+}
+
+function applyStockToProducts(items){
+  if(!Array.isArray(items) || !items.length) return false;
+  const map = new Map();
+  items.forEach(row => {
+    const parsed = parseStockRow(row);
+    if(!parsed) return;
+    if(!map.has(parsed.productId)) map.set(parsed.productId, {});
+    map.get(parsed.productId)[parsed.size] = parsed.qty;
+  });
+  if(!map.size) return false;
+  STATE.products.forEach(product => {
+    const entry = map.get(product.id);
+    if(!entry) return;
+    product.stock = {...(product.stock || {}), ...entry};
+    (product.sizes || []).forEach(size => {
+      if(Object.prototype.hasOwnProperty.call(entry, size)){
+        product.availability[size] = Number(entry[size]) > 0;
+      }
+    });
+  });
+  return true;
+}
+
+async function fetchStockFromSheets(){
+  const url = getSheetsWebAppUrl();
+  if(!url) throw new Error('Sheets Web App URL missing');
+  const payload = await jsonpRequest(url, {action:STOCK_ACTION}, SHEETS_WEB_APP_TIMEOUT);
+  if(Array.isArray(payload)) return payload;
+  if(payload && Array.isArray(payload.data)) return payload.data;
+  return payload && payload.data ? payload.data : [];
+}
+
+function refreshInventoryUI(){
+  const admin = isAdminSession();
+  $$('[data-product-id]').forEach(host => {
+    const productId = host.dataset.productId;
+    const product = STATE.products.find(p => p.id === productId);
+    if(!product) return;
+    const sizeSelect = host.querySelector('[data-stock-size]');
+    if(sizeSelect){
+      const includeEmpty = sizeSelect.dataset.includeEmpty !== '0';
+      renderSizeOptions(sizeSelect, product, {includeEmpty, showCount:admin});
+    }
+    const sizeValue = sizeSelect ? sizeSelect.value : '';
+    updateStockNote(host.querySelector('[data-stock-note]'), product, sizeValue, admin);
+    updateBuyButtonState(host.querySelector('[data-stock-buy]'), product, sizeValue);
+    host.classList.toggle('out-of-stock', !hasAnyStock(product));
+  });
+  if(ORDER_DRAWER_STATE?.product) syncOrderDrawer();
+  if(CHECKOUT_STATE?.product) syncCheckoutSummary();
+}
+
+function renderAdminStockTable(host){
+  if(!host) return;
+  const sizes = STOCK_SIZE_TOKENS.slice().reverse();
+  const header = ['Фото','SKU','Модель', ...sizes, 'Разом'];
+  const rows = STATE.products.map(product => {
+    const stock = product.stock || {};
+    const hasStock = Object.keys(stock).length > 0;
+    const total = hasStock
+      ? Object.values(stock).reduce((sum, value) => sum + (Number(value) || 0), 0)
+      : '—';
+    const imgSrc = (product.images && product.images[0]) ? product.images[0] : 'images/logo.png';
+    const cells = sizes.map(size => {
+      if(!hasStock || !Object.prototype.hasOwnProperty.call(stock, size)){
+        return '<td class="na">—</td>';
+      }
+      const qty = Number(stock[size]) || 0;
+      const cls = qty <= 0 ? 'zero' : '';
+      return `<td class="${cls}">${qty}</td>`;
+    }).join('');
+    return `<tr><td><img class="admin-stock-photo" src="${imgSrc}" alt="${product.name}"></td><td class="sku">${product.id.toUpperCase()}</td><td class="name">${product.name}</td>${cells}<td>${total}</td></tr>`;
+  }).join('');
+
+  host.innerHTML = `<table class="admin-stock-table"><thead><tr>${header.map(h => `<th>${h}</th>`).join('')}</tr></thead><tbody>${rows}</tbody></table>`;
+}
+
+function bootAdminPanel(){
+  const host = $('#adminTable');
+  if(!host) return;
+  host.innerHTML = '';
+  const status = document.createElement('div');
+  status.className = 'admin-stock-status';
+  host.appendChild(status);
+  const tableWrap = document.createElement('div');
+  host.appendChild(tableWrap);
+
+  const render = () => {
+    renderAdminStockTable(tableWrap);
+  };
+
+  const applyData = data => {
+    if(Array.isArray(data) && data.length){
+      applyStockToProducts(data);
+      saveStockCache(data);
+    }
+    render();
+  };
+
+  const cached = loadStockCache();
+  if(cached) applyData(cached);
+  else render();
+
+  const refresh = async () => {
+    status.textContent = 'Оновлюємо...';
+    try{
+      const data = await fetchStockFromSheets();
+      applyData(data);
+      status.textContent = data && data.length ? 'Оновлено' : 'Дані порожні';
+    }catch(err){
+      status.textContent = 'Не вдалося отримати залишки';
+      console.warn('Admin stock fetch failed', err);
+    }
+  };
+
+  const refreshBtn = $('#adminRefreshStock');
+  if(refreshBtn) refreshBtn.addEventListener('click', refresh);
+  refresh();
+}
+
+function bootInventory(){
+  const cached = loadStockCache();
+  if(cached){
+    if(applyStockToProducts(cached)){
+      refreshInventoryUI();
+    }
+  }
+  const url = getSheetsWebAppUrl();
+  if(!url) return;
+  fetchStockFromSheets()
+    .then(data => {
+      if(!data || !data.length) return;
+      if(applyStockToProducts(data)){
+        saveStockCache(data);
+        refreshInventoryUI();
+      }
+    })
+    .catch(err => {
+      console.warn('Stock fetch failed', err);
+    });
 }
 
 function getNovaPoshtaApiKey(){
@@ -597,6 +898,40 @@ function renderBranchOptions(branchSelect, branches, emptyLabel = 'Відділ�
   });
 }
 
+function ensureDataList(input, key){
+  if(!input) return null;
+  const id = `npList_${key}_${Math.random().toString(36).slice(2,8)}`;
+  const list = document.createElement('datalist');
+  list.id = id;
+  document.body.appendChild(list);
+  input.setAttribute('list', id);
+  return list;
+}
+
+function renderDataList(list, items){
+  if(!list) return;
+  list.innerHTML = '';
+  items.forEach(item => {
+    const option = document.createElement('option');
+    option.value = item.value;
+    if(item.label && item.label !== item.value) option.label = item.label;
+    list.appendChild(option);
+  });
+}
+
+function syncSelectFromInput(select, input){
+  if(!select || !input) return false;
+  const value = String(input.value || '').trim().toLowerCase();
+  if(!value) return false;
+  const options = Array.from(select.options);
+  const match = options.find(opt => String(opt.value || '').trim().toLowerCase() === value);
+  if(match && !match.disabled){
+    select.value = match.value;
+    return true;
+  }
+  return false;
+}
+
 function setupNovaPoshtaSelects(refs){
   if(!refs) return;
   const {
@@ -611,6 +946,8 @@ function setupNovaPoshtaSelects(refs){
   } = refs;
   if(!citySelect || !branchSelect) return;
   const useApi = Boolean(getNovaPoshtaProxyUrl() || getNovaPoshtaApiKey());
+  const cityDataList = ensureDataList(citySearch, 'city');
+  const branchDataList = ensureDataList(branchSearch, 'branch');
   const deliveryInputs = Array.isArray(deliveryTypeInputs)
     ? deliveryTypeInputs
     : (deliveryTypeInputs ? Array.from(deliveryTypeInputs) : []);
@@ -659,7 +996,9 @@ function setupNovaPoshtaSelects(refs){
   const renderStaticCities = term => {
     const search = (term || '').trim().toLowerCase();
     const cities = NOVA_POSHTA_LOCATIONS.filter(loc => !search || loc.city.toLowerCase().includes(search));
-    renderCityOptions(citySelect, cities.map(loc => ({Description:loc.city, city:loc.city})));
+    const mapped = cities.map(loc => ({Description:loc.city, city:loc.city}));
+    renderCityOptions(citySelect, mapped);
+    renderDataList(cityDataList, mapped.map(city => ({value:city.Description || city.city || '', label:city.AreaDescription || ''})));
   };
 
   const renderStaticBranches = () => {
@@ -667,22 +1006,27 @@ function setupNovaPoshtaSelects(refs){
     const deliveryType = getDeliveryType();
     if(deliveryType === 'courier'){
       renderBranchOptions(branchSelect, [], getBranchEmptyLabel(deliveryType));
+      renderDataList(branchDataList, []);
       return;
     }
     const selected = citySelect.options[citySelect.selectedIndex];
     if(!citySelect.value || selected?.disabled){
       renderBranchOptions(branchSelect, [], getBranchEmptyLabel(deliveryType));
+      renderDataList(branchDataList, []);
       return;
     }
     const loc = NOVA_POSHTA_LOCATIONS.find(l => l.city === citySelect.value) || NOVA_POSHTA_LOCATIONS[0];
     const branches = (loc?.branches || []).filter(branch => !search || branch.toLowerCase().includes(search));
-    renderBranchOptions(branchSelect, filterBranchesByDeliveryType(branches, deliveryType), getBranchEmptyLabel(deliveryType));
+    const filtered = filterBranchesByDeliveryType(branches, deliveryType);
+    renderBranchOptions(branchSelect, filtered, getBranchEmptyLabel(deliveryType));
+    renderDataList(branchDataList, filtered.map(value => ({value})));
   };
 
   const renderApiCities = async term => {
     try{
       const cities = await fetchNovaPoshtaCities(term);
       renderCityOptions(citySelect, cities);
+      renderDataList(cityDataList, cities.map(city => ({value:city.Description || city.city || '', label:city.AreaDescription || ''})));
       await renderApiBranches();
     }catch(err){
       console.warn('Nova Poshta cities failed', err);
@@ -696,6 +1040,7 @@ function setupNovaPoshtaSelects(refs){
     const deliveryType = getDeliveryType();
     if(deliveryType === 'courier'){
       renderBranchOptions(branchSelect, [], getBranchEmptyLabel(deliveryType));
+      renderDataList(branchDataList, []);
       return;
     }
     const option = citySelect.options[citySelect.selectedIndex];
@@ -704,6 +1049,7 @@ function setupNovaPoshtaSelects(refs){
     const term = (branchSearch?.value || '').trim();
     if(!cityName || option?.disabled){
       renderBranchOptions(branchSelect, [], getBranchEmptyLabel(deliveryType));
+      renderDataList(branchDataList, []);
       return;
     }
     try{
@@ -711,6 +1057,7 @@ function setupNovaPoshtaSelects(refs){
       const filtered = filterWarehouseItemsByDeliveryType(data, deliveryType);
       const branches = filtered.map(item => item.Description).filter(Boolean);
       renderBranchOptions(branchSelect, branches, getBranchEmptyLabel(deliveryType));
+      renderDataList(branchDataList, branches.map(value => ({value})));
     }catch(err){
       console.warn('Nova Poshta branches failed', err);
       renderStaticBranches();
@@ -734,6 +1081,9 @@ function setupNovaPoshtaSelects(refs){
       }
     });
     citySearch.addEventListener('input', handler);
+    citySearch.addEventListener('change', () => {
+      if(syncSelectFromInput(citySelect, citySearch)) updateDeliveryUI();
+    });
   }
   if(branchSearch){
     const handler = debounce(() => {
@@ -742,6 +1092,9 @@ function setupNovaPoshtaSelects(refs){
       else renderStaticBranches();
     });
     branchSearch.addEventListener('input', handler);
+    branchSearch.addEventListener('change', () => {
+      syncSelectFromInput(branchSelect, branchSearch);
+    });
   }
   citySelect.addEventListener('change', onCityChange);
 
@@ -857,6 +1210,7 @@ function bootCommon(){
         clicks = 0;
         const pin = prompt('PIN?');
         if(pin === ADMIN_PIN){
+          setAdminSession();
           location.href = 'admin.html';
           return;
         }
@@ -1105,9 +1459,57 @@ function bootPromoHighlights(){
 }
 
 /* ===== Product Card ===== */
+function renderSizeOptions(select, product, opts = {}){
+  if(!select || !product) return;
+  const includeEmpty = opts.includeEmpty !== false;
+  const showCount = Boolean(opts.showCount);
+  const current = select.value;
+  const options = (product.sizes || []).map(size => {
+    const label = buildSizeOptionLabel(product, size, showCount);
+    const disabled = !isSizeAvailable(product, size);
+    return `<option value="${size}" ${disabled ? 'disabled' : ''}>${label}</option>`;
+  }).join('');
+  select.innerHTML = `${includeEmpty ? '<option value="">— оберіть —</option>' : ''}${options}`;
+  if(current && isSizeAvailable(product, current)){
+    select.value = current;
+  }
+}
+
+function updateStockNote(noteEl, product, size, isAdmin){
+  if(!noteEl || !product) return;
+  let text = '';
+  let isOut = false;
+  const selected = size || '';
+  if(selected){
+    const qty = getSizeStock(product, selected);
+    if(qty !== null){
+      if(qty <= 0){
+        text = 'Нема в наявності';
+        isOut = true;
+      }else if(isAdmin){
+        text = `В наявності: ${qty} шт`;
+      }
+    }
+  }else if(!hasAnyStock(product)){
+    text = 'Нема в наявності';
+    isOut = true;
+  }
+  noteEl.textContent = text;
+  noteEl.classList.toggle('out', isOut);
+}
+
+function updateBuyButtonState(button, product, size){
+  if(!button || !product) return;
+  if(!button.dataset.label) button.dataset.label = button.textContent;
+  const available = size ? isSizeAvailable(product, size) : hasAnyStock(product);
+  button.disabled = !available;
+  button.textContent = available ? button.dataset.label : 'Нема в наявності';
+}
+
 function createProductCard(product){
   const card = document.createElement('article');
   card.className = 'product-card reveal';
+  card.dataset.productId = product.id;
 
   const wrap = document.createElement('div');
   wrap.className = 'pimg-wrap';
@@ -1174,12 +1576,16 @@ function createProductCard(product){
   const sizeLabel = document.createElement('div');
   sizeLabel.textContent = 'Розмір:';
   const select = document.createElement('select');
-  select.innerHTML = '<option value="">— оберіть —</option>' + product.sizes.map(size => {
-    const available = product.availability[size];
-    return `<option value="${size}" ${available ? '' : 'disabled'}>${size}${available ? '' : ' (немає)'}</option>`;
-  }).join('');
+  select.dataset.stockSize = '1';
+  select.dataset.includeEmpty = '1';
+  renderSizeOptions(select, product, {includeEmpty:true, showCount:isAdminSession()});
   sizeRow.append(sizeLabel, select);
   card.appendChild(sizeRow);
+
+  const stockNote = document.createElement('div');
+  stockNote.className = 'stock-note';
+  stockNote.dataset.stockNote = '1';
+  card.appendChild(stockNote);
 
   const actions = document.createElement('div');
   actions.className = 'actions';
@@ -1187,8 +1593,16 @@ function createProductCard(product){
   orderBtn.type = 'button';
   orderBtn.className = 'btn btn-primary';
   orderBtn.textContent = 'Купити';
+  orderBtn.dataset.stockBuy = '1';
   actions.append(orderBtn);
   card.appendChild(actions);
+
+  const syncStock = () => {
+    updateStockNote(stockNote, product, select.value, isAdminSession());
+    updateBuyButtonState(orderBtn, product, select.value);
+    card.classList.toggle('out-of-stock', !hasAnyStock(product));
+  };
+  syncStock();
 
   orderBtn.addEventListener('click', () => {
     const size = select.value || firstAvailableSize(product) || product.sizes[0];
@@ -1201,6 +1615,7 @@ function createProductCard(product){
     if(evt.target.closest('button') || evt.target.closest('select')) return;
     location.href = `product.html?id=${encodeURIComponent(product.id)}`;
   });
+  select.addEventListener('change', syncStock);
 
   return card;
 }
@@ -1245,6 +1660,7 @@ function buildProductGallery(product){
 function createProductDetail(product){
   const wrap = document.createElement('div');
   wrap.className = 'product-page';
+  wrap.dataset.productId = product.id;
 
   const grid = document.createElement('div');
   grid.className = 'product-page-grid';
@@ -1303,10 +1719,9 @@ function createProductDetail(product){
   form.className = 'product-form';
 
   const sizeSelect = document.createElement('select');
-  sizeSelect.innerHTML = '<option value="">— оберіть —</option>' + (product.sizes || []).map(size => {
-    const available = product.availability[size];
-    return `<option value="${size}" ${available ? '' : 'disabled'}>${size}${available ? '' : ' (немає)'}</option>`;
-  }).join('');
+  sizeSelect.dataset.stockSize = '1';
+  sizeSelect.dataset.includeEmpty = '1';
+  renderSizeOptions(sizeSelect, product, {includeEmpty:true, showCount:isAdminSession()});
 
   const packSelect = document.createElement('select');
   packOptions.forEach(opt => {
@@ -1344,10 +1759,14 @@ function createProductDetail(product){
   const qtyNote = document.createElement('div');
   qtyNote.className = 'product-qty-note';
 
+  const stockNote = document.createElement('div');
+  stockNote.className = 'stock-note';
+  stockNote.dataset.stockNote = '1';
+
   const summary = document.createElement('div');
   summary.className = 'product-price-summary';
 
-  form.append(sizeLabel, packLabel, qtyControl, summary, qtyNote);
+  form.append(sizeLabel, packLabel, stockNote, qtyControl, summary, qtyNote);
 
   const actions = document.createElement('div');
   actions.className = 'product-page-actions';
@@ -1355,6 +1774,7 @@ function createProductDetail(product){
   buyBtn.type = 'button';
   buyBtn.className = 'btn btn-primary';
   buyBtn.textContent = 'Купити';
+  buyBtn.dataset.stockBuy = '1';
   const backLink = document.createElement('a');
   backLink.className = 'btn btn-ghost';
   backLink.href = 'index.html#homeCatalog';
@@ -1403,8 +1823,16 @@ function createProductDetail(product){
   };
   updateSummary();
 
+  const syncStock = () => {
+    updateStockNote(stockNote, product, sizeSelect.value, isAdminSession());
+    updateBuyButtonState(buyBtn, product, sizeSelect.value);
+    wrap.classList.toggle('out-of-stock', !hasAnyStock(product));
+  };
+  syncStock();
+
   sizeSelect.addEventListener('change', () => {
     state.size = sizeSelect.value;
+    syncStock();
   });
   packSelect.addEventListener('change', () => {
     state.packSize = normalizePackSize(product, Number(packSelect.value) || defaultPack);
@@ -1624,6 +2052,10 @@ function openOrder(product, size, options={}){
     return;
   }
   const normalizedSize = size || firstAvailableSize(product) || (product.sizes || [])[0] || '';
+  if(!normalizedSize || !isSizeAvailable(product, normalizedSize)){
+    alert('Немає в наявності для вибраного розміру.');
+    return;
+  }
   const packSize = normalizePackSize(product, options.packSize);
   const packs = Math.max(1, options.packs || 1);
   const payload = {
@@ -1680,7 +2112,7 @@ function syncOrderDrawer(){
   const packSize = ORDER_DRAWER_STATE.packSize;
   const sizeList = product.sizes || [];
   ORDER_DRAWER_STATE.packs = Math.max(1, ORDER_DRAWER_STATE.packs || 1);
-  if(!sizeList.includes(ORDER_DRAWER_STATE.size)){
+  if(!sizeList.includes(ORDER_DRAWER_STATE.size) || !isSizeAvailable(product, ORDER_DRAWER_STATE.size)){
     ORDER_DRAWER_STATE.size = firstAvailableSize(product) || sizeList[0] || '';
   }
   if(ORDER_DRAWER_REFS.sizeSelect){
@@ -1688,8 +2120,8 @@ function syncOrderDrawer(){
     sizeList.forEach(size => {
       const option = document.createElement('option');
       option.value = size;
-      option.textContent = `${size}${product.availability[size] ? '' : ' (немає)'}`;
-      option.disabled = !product.availability[size];
+      option.textContent = buildSizeOptionLabel(product, size, isAdminSession());
+      option.disabled = !isSizeAvailable(product, size);
       ORDER_DRAWER_REFS.sizeSelect.appendChild(option);
     });
     ORDER_DRAWER_REFS.sizeSelect.value = ORDER_DRAWER_STATE.size;
@@ -1722,6 +2154,12 @@ function syncOrderDrawer(){
     const totalPieces = packSize * ORDER_DRAWER_STATE.packs;
     ORDER_DRAWER_REFS.checkoutSummary.textContent = `${product.name} • ${ORDER_DRAWER_STATE.size || 'оберіть розмір'} • ${ORDER_DRAWER_STATE.packs} ${pluralPacks(ORDER_DRAWER_STATE.packs)} (${totalPieces} шт) • ${formatCurrency(perPackPrice * ORDER_DRAWER_STATE.packs)}`;
   }
+  if(ORDER_DRAWER_REFS.stockNote){
+    updateStockNote(ORDER_DRAWER_REFS.stockNote, product, ORDER_DRAWER_STATE.size, isAdminSession());
+  }
+  if(ORDER_DRAWER_REFS.checkoutBtn){
+    updateBuyButtonState(ORDER_DRAWER_REFS.checkoutBtn, product, ORDER_DRAWER_STATE.size);
+  }
 }
 
 function populateNovaPoshtaSelects(){
@@ -1745,6 +2183,7 @@ function bootOrderDrawer(){
     modal,
     form,
     sizeSelect,
+    checkoutBtn,
     packSelect:$('#drawerPackSize'),
     deliveryTypeInputs:$$('input[name="deliveryType"]', form),
     deliveryBranchWrap:$('[data-delivery-branch]', form),
@@ -1763,6 +2202,17 @@ function bootOrderDrawer(){
     packCountEl:$('#drawerPackCount'),
     piecesEl:$('#drawerPiecesCount')
   };
+  if(checkoutBtn && !checkoutBtn.dataset.label){
+    checkoutBtn.dataset.label = checkoutBtn.textContent;
+  }
+  const packWrap = sizeSelect.closest('.drawer-pack');
+  if(packWrap){
+    const stockNote = document.createElement('div');
+    stockNote.className = 'stock-note';
+    stockNote.dataset.stockNote = '1';
+    packWrap.insertBefore(stockNote, packWrap.querySelector('.qty-control'));
+    ORDER_DRAWER_REFS.stockNote = stockNote;
+  }
   populateNovaPoshtaSelects();
   drawer.classList.remove('form-open');
   sizeSelect.addEventListener('change', () => {
@@ -1855,6 +2305,7 @@ function bootOrderDrawer(){
     const summary = `ЗАМОВЛЕННЯ MI_STORE\nМодель: ${product.name}\nРозмір: ${ORDER_DRAWER_STATE.size || 'не вказано'}\nКомплектів: ${packs} (по ${packSize} шт)\nВсього штук: ${totalPieces}\nСума: ${formatCurrency(totalPrice)} без доставки\n—\nІм’я: ${firstName} ${lastName}\nТелефон: ${phone}\nМісто: ${city}\nДоставка: ${deliverySummary}\nОплата: ${payment}\nКоментар: ${fd.get('comment') || ''}`;
     const payload = {
       source:'quick-order',
+      type:'Продаж',
       createdAt:new Date().toISOString(),
       orderId:String(Date.now()),
       productId:product.id,
@@ -1871,6 +2322,10 @@ function bootOrderDrawer(){
       phone,
       npCity:city,
       npBranch:deliverySummary,
+      deliveryType,
+      deliveryLabel,
+      deliveryValue,
+      courierAddress: deliveryType === 'courier' ? courierAddress : '',
       payment,
       comment:String(fd.get('comment') || ''),
       page:location.href
@@ -1908,7 +2363,7 @@ function syncCheckoutSummary(){
   const packOptions = getPackOptions(product);
   CHECKOUT_STATE.packSize = normalizePackSize(product, CHECKOUT_STATE.packSize);
   CHECKOUT_STATE.packs = Math.max(1, CHECKOUT_STATE.packs || 1);
-  if(!product.sizes.includes(CHECKOUT_STATE.size)){
+  if(!product.sizes.includes(CHECKOUT_STATE.size) || !isSizeAvailable(product, CHECKOUT_STATE.size)){
     CHECKOUT_STATE.size = firstAvailableSize(product) || product.sizes[0] || '';
   }
   const packSize = CHECKOUT_STATE.packSize;
@@ -1923,8 +2378,8 @@ function syncCheckoutSummary(){
     product.sizes.forEach(size => {
       const opt = document.createElement('option');
       opt.value = size;
-      opt.textContent = `${size}${product.availability[size] ? '' : ' (немає)'}`;
-      opt.disabled = !product.availability[size];
+      opt.textContent = buildSizeOptionLabel(product, size, isAdminSession());
+      opt.disabled = !isSizeAvailable(product, size);
       CHECKOUT_REFS.sizeSelect.appendChild(opt);
     });
     CHECKOUT_REFS.sizeSelect.value = CHECKOUT_STATE.size;
@@ -1944,6 +2399,12 @@ function syncCheckoutSummary(){
   if(CHECKOUT_REFS.piecesEl) CHECKOUT_REFS.piecesEl.textContent = `${packs * packSize} шт загалом`;
   if(CHECKOUT_REFS.pricePackEl) CHECKOUT_REFS.pricePackEl.textContent = formatCurrency(perPack);
   if(CHECKOUT_REFS.totalEl) CHECKOUT_REFS.totalEl.textContent = formatCurrency(total);
+  if(CHECKOUT_REFS.stockNote){
+    updateStockNote(CHECKOUT_REFS.stockNote, product, CHECKOUT_STATE.size, isAdminSession());
+  }
+  if(CHECKOUT_REFS.submitBtn){
+    updateBuyButtonState(CHECKOUT_REFS.submitBtn, product, CHECKOUT_STATE.size);
+  }
 }
 
 function bootCheckoutPage(){
@@ -1962,6 +2423,7 @@ function bootCheckoutPage(){
     piecesEl:document.querySelector('[data-co-pieces]'),
     pricePackEl:document.querySelector('[data-co-price]'),
     totalEl:document.querySelector('[data-co-total]'),
+    submitBtn:form ? form.querySelector('button[type="submit"]') : null,
     deliveryTypeInputs:form ? $$('input[name="deliveryType"]', form) : [],
     deliveryBranchWrap:form ? $('[data-delivery-branch]', form) : null,
     deliveryBranchTitle:form ? $('.delivery-branch-title', form) : null,
@@ -1973,6 +2435,17 @@ function bootCheckoutPage(){
     form,
     paymentNote:document.querySelector('#coPaymentNote')
   };
+  if(CHECKOUT_REFS.submitBtn && !CHECKOUT_REFS.submitBtn.dataset.label){
+    CHECKOUT_REFS.submitBtn.dataset.label = CHECKOUT_REFS.submitBtn.textContent;
+  }
+  const metaLine = root.querySelector('.checkout-meta-line');
+  if(metaLine){
+    const stockNote = document.createElement('div');
+    stockNote.className = 'stock-note';
+    stockNote.dataset.stockNote = '1';
+    metaLine.insertAdjacentElement('afterend', stockNote);
+    CHECKOUT_REFS.stockNote = stockNote;
+  }
   preventFormEnterSubmit(CHECKOUT_REFS.form);
   const payload = loadCheckoutPayload();
   const product = payload ? (STATE.products.find(p => p.id === payload.id) || STATE.products[0]) : STATE.products[0];
@@ -2053,6 +2526,7 @@ function bootCheckoutPage(){
       const summary = `ЗАМОВЛЕННЯ MI_STORE\nМодель: ${product.name}\nРозмір: ${CHECKOUT_STATE.size}\nКомплектів: ${packs} (по ${packSize} шт)\nВсього штук: ${totalPieces}\nСума: ${formatCurrency(totalPrice)} без доставки\n—\nІм’я: ${firstName} ${lastName}\nТелефон: ${phone}\nМісто: ${city}\nДоставка: ${deliverySummary}\nОплата: ${payment}\nКоментар: ${comment}`;
       const payload = {
         source:'checkout-page',
+        type:'Продаж',
         createdAt:new Date().toISOString(),
         orderId:String(Date.now()),
         productId:product.id,
@@ -2069,6 +2543,10 @@ function bootCheckoutPage(){
         phone,
         npCity:city,
         npBranch:deliverySummary,
+        deliveryType,
+        deliveryLabel,
+        deliveryValue,
+        courierAddress: deliveryType === 'courier' ? courierAddress : '',
         payment,
         comment,
         page:location.href
@@ -2255,6 +2733,11 @@ function bootInstagram(){
       orderBtn.type = 'button';
       orderBtn.className = 'btn btn-primary';
       orderBtn.textContent = 'Замовити';
+      orderBtn.dataset.label = orderBtn.textContent;
+      if(product){
+        updateBuyButtonState(orderBtn, product, firstAvailableSize(product));
+        card.classList.toggle('out-of-stock', !hasAnyStock(product));
+      }
       orderBtn.addEventListener('click', () => {
         if(product){
           const size = firstAvailableSize(product) || product.sizes[0];
@@ -2303,8 +2786,8 @@ function bootKit(){
         prod.sizes.forEach(size => {
           const option=document.createElement('option');
           option.value=size;
-          option.textContent=size + (prod.availability[size] ? '' : ' (немає)');
-          option.disabled=!prod.availability[size];
+          option.textContent = buildSizeOptionLabel(prod, size, isAdminSession());
+          option.disabled = !isSizeAvailable(prod, size);
           sizeSel.appendChild(option);
         });
       };
@@ -2535,6 +3018,8 @@ function bootHomeCatalog(){
 document.addEventListener('DOMContentLoaded', () => {
   triggerPageIntro();
   bootCommon();
+  bootInventory();
+  bootAdminPanel();
   bootMustHaveSlider();
   bootPromoHighlights();
   bootOrderDrawer();
